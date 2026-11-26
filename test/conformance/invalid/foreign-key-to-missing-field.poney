@@ -1,0 +1,101 @@
+{
+  "poneyVersion": "0.2.0",
+  "project": {
+    "id": "tiny",
+    "name": "Tiny",
+    "description": "The smallest useful document."
+  },
+  "model": {
+    "entities": [
+      {
+        "id": "user",
+        "kind": "person",
+        "name": "User",
+        "summary": "Uses the app."
+      },
+      {
+        "id": "app",
+        "kind": "web-app",
+        "name": "App",
+        "summary": "The app people use."
+      },
+      {
+        "id": "api",
+        "kind": "service",
+        "name": "API",
+        "summary": "Answers the app."
+      }
+    ],
+    "relationships": [
+      {
+        "id": "r-user-app",
+        "kind": "uses",
+        "source": "user",
+        "target": "app",
+        "label": "Uses"
+      },
+      {
+        "id": "r-app-api",
+        "kind": "calls",
+        "source": "app",
+        "target": "api",
+        "label": "Fetches data from",
+        "protocol": "HTTPS"
+      }
+    ],
+    "dataTypes": [
+      {
+        "id": "users",
+        "kind": "table",
+        "name": "users",
+        "summary": "Accounts.",
+        "fields": [
+          {
+            "name": "id",
+            "type": "uuid",
+            "primaryKey": true
+          }
+        ]
+      },
+      {
+        "id": "posts",
+        "kind": "table",
+        "name": "posts",
+        "summary": "Posts.",
+        "fields": [
+          {
+            "name": "id",
+            "type": "uuid",
+            "primaryKey": true
+          },
+          {
+            "name": "author_id",
+            "type": "uuid",
+            "references": {
+              "dataType": "users",
+              "field": "uuid"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "views": [
+    {
+      "id": "main",
+      "type": "architecture",
+      "title": "Main",
+      "description": "Everything.",
+      "category": "overview",
+      "entities": [
+        "user",
+        "app",
+        "api"
+      ]
+    }
+  ],
+  "presentation": {
+    "kinds": {},
+    "relationships": {}
+  }
+}

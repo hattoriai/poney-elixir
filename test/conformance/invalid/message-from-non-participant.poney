@@ -1,0 +1,147 @@
+{
+  "poneyVersion": "0.2.0",
+  "project": {
+    "id": "tiny",
+    "name": "Tiny",
+    "description": "The smallest useful document."
+  },
+  "model": {
+    "entities": [
+      {
+        "id": "user",
+        "kind": "person",
+        "name": "User",
+        "summary": "Uses the app."
+      },
+      {
+        "id": "app",
+        "kind": "web-app",
+        "name": "App",
+        "summary": "The app people use."
+      },
+      {
+        "id": "api",
+        "kind": "service",
+        "name": "API",
+        "summary": "Answers the app."
+      }
+    ],
+    "relationships": [
+      {
+        "id": "r-user-app",
+        "kind": "uses",
+        "source": "user",
+        "target": "app",
+        "label": "Uses"
+      },
+      {
+        "id": "r-app-api",
+        "kind": "calls",
+        "source": "app",
+        "target": "api",
+        "label": "Fetches data from",
+        "protocol": "HTTPS"
+      }
+    ],
+    "behaviors": [
+      {
+        "kind": "interaction",
+        "id": "load",
+        "name": "App loads",
+        "summary": "First load.",
+        "participants": [
+          "user",
+          "app",
+          "api"
+        ],
+        "steps": [
+          {
+            "type": "message",
+            "id": "m1",
+            "kind": "call",
+            "from": "intruder",
+            "to": "app",
+            "label": "Open"
+          },
+          {
+            "type": "fragment",
+            "id": "f1",
+            "kind": "alt",
+            "label": "Cache",
+            "branches": [
+              {
+                "guard": "cached",
+                "steps": [
+                  {
+                    "type": "message",
+                    "id": "m2",
+                    "kind": "self",
+                    "from": "app",
+                    "to": "app",
+                    "label": "Read cache"
+                  }
+                ]
+              },
+              {
+                "guard": "not cached",
+                "steps": [
+                  {
+                    "type": "message",
+                    "id": "m3",
+                    "kind": "call",
+                    "from": "app",
+                    "to": "api",
+                    "label": "GET /data",
+                    "relationship": "r-app-api"
+                  },
+                  {
+                    "type": "message",
+                    "id": "m4",
+                    "kind": "return",
+                    "from": "api",
+                    "to": "app",
+                    "label": "200 OK"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "message",
+            "id": "m5",
+            "kind": "return",
+            "from": "app",
+            "to": "user",
+            "label": "Show page"
+          }
+        ]
+      }
+    ]
+  },
+  "views": [
+    {
+      "id": "main",
+      "type": "architecture",
+      "title": "Main",
+      "description": "Everything.",
+      "category": "overview",
+      "entities": [
+        "user",
+        "app",
+        "api"
+      ]
+    },
+    {
+      "id": "load-seq",
+      "type": "sequence",
+      "title": "Load",
+      "description": "Load sequence.",
+      "category": "behavior",
+      "interaction": "load"
+    }
+  ],
+  "presentation": {
+    "kinds": {},
+    "relationships": {}
+  }
+}

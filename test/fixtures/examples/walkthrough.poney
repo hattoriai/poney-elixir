@@ -1,0 +1,644 @@
+{
+  "poneyVersion": "0.2.0",
+  "project": {
+    "id": "acme-notes",
+    "name": "Acme Notes",
+    "description": "A note-taking web app."
+  },
+  "model": {
+    "entities": [
+      {
+        "id": "user",
+        "kind": "person",
+        "name": "User",
+        "summary": "Someone who signs in to read and write notes."
+      },
+      {
+        "id": "web",
+        "kind": "web-app",
+        "name": "Web app",
+        "summary": "The sign-in page and the notes.",
+        "technology": "React"
+      },
+      {
+        "id": "api",
+        "kind": "service",
+        "name": "Notes API",
+        "summary": "Signs people in and stores their notes.",
+        "technology": "Node.js",
+        "sourceRefs": [
+          {
+            "path": "api/src/auth/sessions.ts",
+            "symbol": "createSession"
+          }
+        ]
+      },
+      {
+        "id": "db",
+        "kind": "database",
+        "name": "Postgres",
+        "summary": "Accounts and notes.",
+        "technology": "PostgreSQL 16"
+      },
+      {
+        "id": "email",
+        "kind": "external",
+        "name": "Email provider",
+        "summary": "Delivers transactional email."
+      }
+    ],
+    "relationships": [
+      {
+        "id": "r-user-web",
+        "kind": "uses",
+        "source": "user",
+        "target": "web",
+        "label": "Signs in on"
+      },
+      {
+        "id": "r-web-api",
+        "kind": "calls",
+        "source": "web",
+        "target": "api",
+        "label": "Sends the sign-in",
+        "protocol": "HTTPS"
+      },
+      {
+        "id": "r-api-db",
+        "kind": "reads-writes",
+        "source": "api",
+        "target": "db",
+        "label": "Reads and updates accounts",
+        "protocol": "SQL"
+      },
+      {
+        "id": "r-api-email",
+        "kind": "calls",
+        "source": "api",
+        "target": "email",
+        "label": "Sends the unlock link",
+        "protocol": "HTTPS"
+      }
+    ],
+    "dataTypes": [
+      {
+        "id": "users",
+        "kind": "table",
+        "name": "users",
+        "summary": "One row per account.",
+        "storedIn": "db",
+        "fields": [
+          {
+            "name": "id",
+            "type": "uuid",
+            "primaryKey": true
+          },
+          {
+            "name": "email",
+            "type": "citext",
+            "unique": true
+          },
+          {
+            "name": "password_hash",
+            "type": "text"
+          },
+          {
+            "name": "failed_attempts",
+            "type": "smallint",
+            "description": "Failed sign-ins since the last success."
+          },
+          {
+            "name": "locked_until",
+            "type": "timestamptz",
+            "nullable": true
+          }
+        ]
+      }
+    ],
+    "behaviors": [
+      {
+        "kind": "interaction",
+        "id": "sign-in",
+        "name": "User signs in",
+        "summary": "From the sign-in form to a session, a lock, or an error.",
+        "participants": [
+          "user",
+          "web",
+          "api",
+          "db",
+          "email"
+        ],
+        "steps": [
+          {
+            "type": "message",
+            "id": "s1",
+            "kind": "call",
+            "from": "user",
+            "to": "web",
+            "label": "Submit email and password"
+          },
+          {
+            "type": "message",
+            "id": "s2",
+            "kind": "call",
+            "from": "web",
+            "to": "api",
+            "label": "POST /sessions",
+            "relationship": "r-web-api"
+          },
+          {
+            "type": "message",
+            "id": "s3",
+            "kind": "call",
+            "from": "api",
+            "to": "db",
+            "label": "Find user by email",
+            "relationship": "r-api-db"
+          },
+          {
+            "type": "message",
+            "id": "s4",
+            "kind": "return",
+            "from": "db",
+            "to": "api",
+            "label": "User row",
+            "data": [
+              "users"
+            ]
+          },
+          {
+            "type": "fragment",
+            "id": "f-check",
+            "kind": "alt",
+            "label": "Check",
+            "branches": [
+              {
+                "guard": "account locked",
+                "steps": [
+                  {
+                    "type": "message",
+                    "id": "s5",
+                    "kind": "return",
+                    "from": "api",
+                    "to": "web",
+                    "label": "423 Locked"
+                  },
+                  {
+                    "type": "message",
+                    "id": "s6",
+                    "kind": "return",
+                    "from": "web",
+                    "to": "user",
+                    "label": "Try again in 15 minutes"
+                  }
+                ]
+              },
+              {
+                "guard": "password wrong",
+                "steps": [
+                  {
+                    "type": "message",
+                    "id": "s7",
+                    "kind": "call",
+                    "from": "api",
+                    "to": "db",
+                    "label": "Add a failed attempt",
+                    "relationship": "r-api-db"
+                  },
+                  {
+                    "type": "fragment",
+                    "id": "f-lock",
+                    "kind": "opt",
+                    "label": "Lock",
+                    "branches": [
+                      {
+                        "guard": "fifth failure",
+                        "steps": [
+                          {
+                            "type": "message",
+                            "id": "s8",
+                            "kind": "call",
+                            "from": "api",
+                            "to": "db",
+                            "label": "Lock for 15 minutes",
+                            "relationship": "r-api-db"
+                          },
+                          {
+                            "type": "message",
+                            "id": "s9",
+                            "kind": "async",
+                            "from": "api",
+                            "to": "email",
+                            "label": "Send the unlock link",
+                            "relationship": "r-api-email"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "message",
+                    "id": "s10",
+                    "kind": "return",
+                    "from": "api",
+                    "to": "web",
+                    "label": "401 Unauthorized"
+                  }
+                ]
+              },
+              {
+                "guard": "password right",
+                "steps": [
+                  {
+                    "type": "message",
+                    "id": "s11",
+                    "kind": "call",
+                    "from": "api",
+                    "to": "db",
+                    "label": "Reset failed attempts",
+                    "relationship": "r-api-db"
+                  },
+                  {
+                    "type": "message",
+                    "id": "s12",
+                    "kind": "return",
+                    "from": "api",
+                    "to": "web",
+                    "label": "201 Created + cookie"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "state-machine",
+        "id": "account",
+        "name": "Account",
+        "summary": "Whether an account can sign in.",
+        "subject": "users",
+        "owner": "api",
+        "states": [
+          {
+            "id": "start",
+            "kind": "initial",
+            "name": "Start"
+          },
+          {
+            "id": "active",
+            "kind": "state",
+            "name": "Active",
+            "description": "The account can sign in."
+          },
+          {
+            "id": "locked",
+            "kind": "state",
+            "name": "Locked",
+            "description": "Sign-in is refused until the lock ends.",
+            "outcome": "failure",
+            "entryActions": [
+              "Email the unlock link"
+            ]
+          }
+        ],
+        "transitions": [
+          {
+            "id": "t-create",
+            "from": "start",
+            "to": "active",
+            "event": "Account created"
+          },
+          {
+            "id": "t-lock",
+            "from": "active",
+            "to": "locked",
+            "event": "Fifth failed sign-in",
+            "guard": "within 15 minutes",
+            "actions": [
+              "Set locked_until",
+              "Email the unlock link"
+            ],
+            "triggeredBy": "api"
+          },
+          {
+            "id": "t-unlock",
+            "from": "locked",
+            "to": "active",
+            "event": "Lock ends",
+            "guard": "15 minutes passed or link used",
+            "actions": [
+              "Reset failed attempts"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "walkthroughs": [
+    {
+      "id": "lockout",
+      "title": "Lock an account after five failed sign-ins",
+      "summary": "Five wrong passwords lock the account for 15 minutes, and the owner gets an email to unlock it at once.",
+      "source": {
+        "kind": "Merge request",
+        "ref": "!42",
+        "files": 6,
+        "added": 131,
+        "removed": 12
+      },
+      "story": {
+        "text": "Today anyone can try passwords on an account without limit. After this change, the fifth wrong password in 15 minutes locks the account for 15 minutes. The owner gets an email with a link that unlocks it at once, so a real user is never stuck.",
+        "before": "Wrong password → try again, forever.",
+        "after": "Fifth wrong password → locked 15 minutes, unlock link by email."
+      },
+      "overview": {
+        "type": "map",
+        "title": "Who takes part",
+        "entities": [
+          "user",
+          "web",
+          "api",
+          "db",
+          "email"
+        ]
+      },
+      "verdict": {
+        "risk": "look",
+        "facts": [
+          {
+            "label": "Door",
+            "value": "Two-way. A revert removes the lock; the new columns stay unused."
+          },
+          {
+            "label": "Outside",
+            "value": "Email provider, one new email."
+          },
+          {
+            "label": "Data",
+            "value": "Two new columns on users."
+          },
+          {
+            "label": "Proof",
+            "value": "6 new tests; the email has no test yet."
+          }
+        ],
+        "findings": [
+          {
+            "text": "The lock is per account, not per address: one attacker can lock out any user by guessing on their email.",
+            "severity": "risk",
+            "scene": "states"
+          },
+          {
+            "text": "The unlock email has no test yet.",
+            "severity": "note",
+            "scene": "sign-in"
+          }
+        ]
+      },
+      "marks": [
+        {
+          "ref": "entity:api",
+          "state": "changed"
+        },
+        {
+          "ref": "relationship:r-api-email",
+          "state": "new"
+        },
+        {
+          "ref": "state:account:locked",
+          "state": "new"
+        },
+        {
+          "ref": "transition:account:t-lock",
+          "state": "new"
+        },
+        {
+          "ref": "transition:account:t-unlock",
+          "state": "new"
+        },
+        {
+          "ref": "message:sign-in:s5",
+          "state": "new"
+        },
+        {
+          "ref": "message:sign-in:s6",
+          "state": "new"
+        },
+        {
+          "ref": "message:sign-in:s7",
+          "state": "new"
+        },
+        {
+          "ref": "message:sign-in:s8",
+          "state": "new"
+        },
+        {
+          "ref": "message:sign-in:s9",
+          "state": "new"
+        },
+        {
+          "ref": "message:sign-in:s11",
+          "state": "new"
+        },
+        {
+          "ref": "dataType:users#failed_attempts",
+          "state": "new"
+        },
+        {
+          "ref": "dataType:users#locked_until",
+          "state": "new"
+        }
+      ],
+      "scenes": [
+        {
+          "id": "states",
+          "title": "An account can now be locked",
+          "text": "Accounts had one state. Now the fifth failure in 15 minutes moves an account to Locked, and the lock ends on its own or through the email link.",
+          "risk": "look",
+          "view": {
+            "type": "state",
+            "stateMachine": "account"
+          },
+          "focus": [
+            "state:account:active",
+            "state:account:locked",
+            "transition:account:t-lock",
+            "transition:account:t-unlock"
+          ],
+          "callouts": [
+            {
+              "target": "transition:account:t-lock",
+              "text": "Five failures within 15 minutes, not five ever."
+            },
+            {
+              "target": "transition:account:t-unlock",
+              "text": "Time or the email link, whichever comes first."
+            }
+          ],
+          "cases": [
+            {
+              "when": "Fifth wrong password within 15 minutes",
+              "then": "Locked"
+            },
+            {
+              "when": "Fifth wrong password over two days",
+              "then": "Still active",
+              "note": "the count resets after 15 minutes"
+            },
+            {
+              "when": "User clicks the unlock link",
+              "then": "Active, count reset"
+            }
+          ],
+          "proof": [
+            {
+              "text": "Five failures lock the account",
+              "source": "api/test/auth/lockout.test.ts",
+              "test": "locks after five failures"
+            },
+            {
+              "text": "Failures spread over time do not lock",
+              "source": "api/test/auth/lockout.test.ts",
+              "test": "ignores failures older than 15 minutes"
+            },
+            {
+              "text": "The unlock link works once",
+              "source": "api/test/auth/unlock.test.ts",
+              "test": "unlock link works once"
+            }
+          ],
+          "question": "Should a locked account also refuse password resets for 15 minutes?"
+        },
+        {
+          "id": "sign-in",
+          "title": "Sign-in checks the lock first",
+          "text": "The API now looks at the lock before the password, so a locked account never reveals whether a guess was right.",
+          "risk": "look",
+          "view": {
+            "type": "sequence",
+            "interaction": "sign-in"
+          },
+          "callouts": [
+            {
+              "target": "message:sign-in:s5",
+              "text": "Locked accounts stop here, before the password check."
+            },
+            {
+              "target": "message:sign-in:s8",
+              "text": "The fifth failure sets the lock."
+            },
+            {
+              "target": "message:sign-in:s11",
+              "text": "A success clears the count."
+            }
+          ],
+          "proof": [
+            {
+              "text": "A locked account gets 423 even with the right password",
+              "source": "api/test/auth/lockout.test.ts",
+              "test": "refuses the right password while locked"
+            },
+            {
+              "text": "The unlock email is sent once per lock",
+              "missing": true
+            }
+          ],
+          "code": [
+            {
+              "path": "api/src/auth/sessions.ts",
+              "title": "createSession",
+              "hunks": [
+                {
+                  "header": "@@ -18,6 +18,14 @@ export async function createSession(email, password)",
+                  "lines": [
+                    {
+                      "kind": "ctx",
+                      "old": 18,
+                      "new": 18,
+                      "text": "  const user = await users.findByEmail(email)"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 19,
+                      "text": "  if (user && isLocked(user, now())) throw new Locked(user.locked_until)"
+                    },
+                    {
+                      "kind": "ctx",
+                      "old": 19,
+                      "new": 20,
+                      "text": "  if (!user || !(await verify(password, user.password_hash))) {"
+                    },
+                    {
+                      "kind": "del",
+                      "old": 20,
+                      "text": "    throw new Unauthorized()"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 21,
+                      "text": "    if (user) await recordFailure(user, now())"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 22,
+                      "text": "    throw new Unauthorized()"
+                    },
+                    {
+                      "kind": "ctx",
+                      "old": 21,
+                      "new": 23,
+                      "text": "  }"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 24,
+                      "text": "  await users.resetFailures(user.id)"
+                    }
+                  ]
+                }
+              ],
+              "notes": [
+                {
+                  "line": 19,
+                  "text": "Before the password check, on purpose: a locked account answers the same either way."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "columns",
+          "title": "Two new columns on users",
+          "text": "The count and the end of the lock live on the account row. Existing rows start unlocked with no failures.",
+          "code": [
+            {
+              "path": "api/migrations/0009_lockout.sql",
+              "hunks": [
+                {
+                  "lines": [
+                    {
+                      "kind": "add",
+                      "new": 1,
+                      "text": "ALTER TABLE users"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 2,
+                      "text": "  ADD COLUMN failed_attempts smallint NOT NULL DEFAULT 0,"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 3,
+                      "text": "  ADD COLUMN locked_until timestamptz;"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

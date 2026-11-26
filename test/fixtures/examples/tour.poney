@@ -1,0 +1,618 @@
+{
+  "poneyVersion": "0.2.0",
+  "project": {
+    "id": "acme-notes",
+    "name": "Acme Notes",
+    "description": "A note-taking web app."
+  },
+  "model": {
+    "entities": [
+      {
+        "id": "user",
+        "kind": "person",
+        "name": "User",
+        "summary": "Writes and searches notes."
+      },
+      {
+        "id": "web",
+        "kind": "web-app",
+        "name": "Web app",
+        "summary": "The editor in the browser.",
+        "technology": "React",
+        "sourceRefs": [
+          {
+            "path": "web/src"
+          }
+        ]
+      },
+      {
+        "id": "editor",
+        "kind": "component",
+        "name": "Editor",
+        "summary": "Turns key presses into edits.",
+        "parent": "web",
+        "sourceRefs": [
+          {
+            "path": "web/src/editor"
+          }
+        ]
+      },
+      {
+        "id": "sync",
+        "kind": "component",
+        "name": "Sync client",
+        "summary": "Sends edits to the API, a second after typing stops.",
+        "parent": "web",
+        "sourceRefs": [
+          {
+            "path": "web/src/sync/client.ts",
+            "symbol": "flush"
+          }
+        ]
+      },
+      {
+        "id": "api",
+        "kind": "service",
+        "name": "Notes API",
+        "summary": "Keeps notes and who may read them.",
+        "technology": "Node, Fastify",
+        "sourceRefs": [
+          {
+            "path": "api/src"
+          }
+        ]
+      },
+      {
+        "id": "router",
+        "kind": "component",
+        "name": "Routes",
+        "summary": "Every HTTP route, in one file.",
+        "parent": "api",
+        "sourceRefs": [
+          {
+            "path": "api/src/routes.ts"
+          }
+        ]
+      },
+      {
+        "id": "auth",
+        "kind": "component",
+        "name": "Sessions",
+        "summary": "Finds the user from the session cookie.",
+        "parent": "api",
+        "sourceRefs": [
+          {
+            "path": "api/src/auth/session.ts",
+            "symbol": "requireUser"
+          }
+        ]
+      },
+      {
+        "id": "notes",
+        "kind": "component",
+        "name": "Notes",
+        "summary": "Saves notes, with a version check.",
+        "parent": "api",
+        "sourceRefs": [
+          {
+            "path": "api/src/notes/save.ts",
+            "symbol": "saveNote"
+          }
+        ]
+      },
+      {
+        "id": "search",
+        "kind": "component",
+        "name": "Search",
+        "summary": "Keeps the search index up to date.",
+        "parent": "api",
+        "sourceRefs": [
+          {
+            "path": "api/src/search/queue.ts"
+          }
+        ]
+      },
+      {
+        "id": "db",
+        "kind": "database",
+        "name": "Postgres",
+        "summary": "Notes, users and sessions."
+      },
+      {
+        "id": "index",
+        "kind": "database",
+        "name": "Search index",
+        "summary": "Full-text index of every note.",
+        "technology": "Meilisearch"
+      }
+    ],
+    "relationships": [
+      {
+        "id": "r-user-web",
+        "kind": "uses",
+        "source": "user",
+        "target": "web",
+        "label": "Writes notes in"
+      },
+      {
+        "id": "r-editor-sync",
+        "kind": "calls",
+        "source": "editor",
+        "target": "sync",
+        "label": "Hands over edits"
+      },
+      {
+        "id": "r-sync-router",
+        "kind": "calls",
+        "source": "sync",
+        "target": "router",
+        "label": "PUT /notes/:id",
+        "protocol": "HTTPS"
+      },
+      {
+        "id": "r-router-auth",
+        "kind": "calls",
+        "source": "router",
+        "target": "auth",
+        "label": "Checks the session"
+      },
+      {
+        "id": "r-router-notes",
+        "kind": "calls",
+        "source": "router",
+        "target": "notes",
+        "label": "Calls saveNote"
+      },
+      {
+        "id": "r-auth-db",
+        "kind": "reads",
+        "source": "auth",
+        "target": "db",
+        "label": "Reads sessions"
+      },
+      {
+        "id": "r-notes-db",
+        "kind": "writes",
+        "source": "notes",
+        "target": "db",
+        "label": "Writes the note row"
+      },
+      {
+        "id": "r-notes-search",
+        "kind": "publishes",
+        "source": "notes",
+        "target": "search",
+        "label": "Queues a re-index"
+      },
+      {
+        "id": "r-search-index",
+        "kind": "writes",
+        "source": "search",
+        "target": "index",
+        "label": "Updates the index"
+      }
+    ],
+    "behaviors": [
+      {
+        "id": "save-note",
+        "kind": "interaction",
+        "name": "Save a note",
+        "summary": "One save, from the editor to Postgres.",
+        "participants": [
+          "sync",
+          "router",
+          "auth",
+          "notes",
+          "db",
+          "search"
+        ],
+        "steps": [
+          {
+            "type": "message",
+            "id": "m1",
+            "kind": "call",
+            "from": "sync",
+            "to": "router",
+            "label": "PUT /notes/:id with the version"
+          },
+          {
+            "type": "message",
+            "id": "m2",
+            "kind": "call",
+            "from": "router",
+            "to": "auth",
+            "label": "Check the session cookie"
+          },
+          {
+            "type": "message",
+            "id": "m3",
+            "kind": "return",
+            "from": "auth",
+            "to": "router",
+            "label": "User id"
+          },
+          {
+            "type": "message",
+            "id": "m4",
+            "kind": "call",
+            "from": "router",
+            "to": "notes",
+            "label": "saveNote(user, id, edit)"
+          },
+          {
+            "type": "message",
+            "id": "m5",
+            "kind": "call",
+            "from": "notes",
+            "to": "db",
+            "label": "UPDATE … WHERE version = $v"
+          },
+          {
+            "type": "fragment",
+            "id": "f-version",
+            "kind": "alt",
+            "label": "Version check",
+            "branches": [
+              {
+                "guard": "one row updated",
+                "steps": [
+                  {
+                    "type": "message",
+                    "id": "m6",
+                    "kind": "return",
+                    "from": "db",
+                    "to": "notes",
+                    "label": "1 row"
+                  },
+                  {
+                    "type": "message",
+                    "id": "m7",
+                    "kind": "async",
+                    "from": "notes",
+                    "to": "search",
+                    "label": "Queue a re-index"
+                  },
+                  {
+                    "type": "message",
+                    "id": "m8",
+                    "kind": "return",
+                    "from": "notes",
+                    "to": "router",
+                    "label": "Note, version + 1"
+                  }
+                ]
+              },
+              {
+                "guard": "no row: someone saved first",
+                "steps": [
+                  {
+                    "type": "message",
+                    "id": "m9",
+                    "kind": "return",
+                    "from": "db",
+                    "to": "notes",
+                    "label": "0 rows"
+                  },
+                  {
+                    "type": "message",
+                    "id": "m10",
+                    "kind": "return",
+                    "from": "notes",
+                    "to": "router",
+                    "label": "Conflict"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "message",
+            "id": "m11",
+            "kind": "return",
+            "from": "router",
+            "to": "sync",
+            "label": "200 with the note, or 409"
+          }
+        ]
+      }
+    ]
+  },
+  "views": [
+    {
+      "id": "tour-map",
+      "type": "map",
+      "title": "Acme Notes",
+      "description": "The two apps and the two stores.",
+      "category": "walkthrough",
+      "entities": [
+        "user",
+        "web",
+        "editor",
+        "sync",
+        "api",
+        "router",
+        "auth",
+        "notes",
+        "search",
+        "db",
+        "index"
+      ],
+      "collapsed": [
+        "web",
+        "api"
+      ]
+    }
+  ],
+  "walkthroughs": [
+    {
+      "id": "first-walk",
+      "kind": "tour",
+      "title": "How Acme Notes saves a note",
+      "summary": "A first walk through the Acme Notes code: its parts, and the path of one save from the editor to the database.",
+      "source": {
+        "kind": "Repository",
+        "repository": "acme/notes",
+        "head": "4f2c9a1"
+      },
+      "story": {
+        "text": "Acme Notes is a web editor for notes, with a small API behind it. People type; the app saves a second after they stop, and search finds the note a few seconds later. This tour follows one save. It leaves out sign-up, sharing and billing."
+      },
+      "overview": "tour-map",
+      "verdict": {
+        "risk": "routine",
+        "facts": [
+          {
+            "label": "Stack",
+            "value": "TypeScript: React in web/, Fastify in api/"
+          },
+          {
+            "label": "Run it",
+            "value": "npm run dev, with Postgres from docker compose"
+          },
+          {
+            "label": "Tests",
+            "value": "npm test; the API tests need Postgres"
+          },
+          {
+            "label": "Read first",
+            "value": "api/src/routes.ts, then api/src/notes/save.ts"
+          }
+        ],
+        "findings": [
+          {
+            "text": "Search lags a few seconds behind a save: a note that was just saved may not be found yet.",
+            "severity": "note",
+            "scene": "s-search"
+          }
+        ]
+      },
+      "scenes": [
+        {
+          "id": "s-parts",
+          "title": "Two apps and two stores",
+          "text": "The web app and the API are the two big parts; open them to see their modules. Postgres keeps everything that matters. The search index is a copy that can be rebuilt.",
+          "view": "tour-map",
+          "callouts": [
+            {
+              "target": "entity:web",
+              "text": "The browser app. Editing and syncing are separate modules."
+            },
+            {
+              "target": "entity:api",
+              "text": "One Fastify service. Routes, sessions, notes and search."
+            },
+            {
+              "target": "entity:index",
+              "text": "Only a copy: the API can rebuild it from Postgres."
+            }
+          ]
+        },
+        {
+          "id": "s-entry",
+          "title": "Every request enters through one file",
+          "text": "All HTTP routes are in api/src/routes.ts. Each route first finds the user from the session, then calls one function in a module. To find what a URL does, start here.",
+          "view": {
+            "type": "map",
+            "title": "Inside the API",
+            "entities": [
+              "sync",
+              "api",
+              "router",
+              "auth",
+              "notes",
+              "search",
+              "db"
+            ]
+          },
+          "focus": [
+            "entity:router",
+            "relationship:r-router-auth",
+            "relationship:r-router-notes"
+          ],
+          "callouts": [
+            {
+              "target": "entity:router",
+              "text": "Routes stay thin: they check the session and call a module."
+            }
+          ],
+          "code": [
+            {
+              "path": "api/src/routes.ts",
+              "title": "The save route",
+              "start": 31,
+              "text": "app.put('/notes/:id', async (req, reply) => {\n  const user = await requireUser(req)\n  const result = await saveNote(user, req.params.id, req.body)\n  if (result.conflict) return reply.code(409).send(result.current)\n  return result.note\n})",
+              "notes": [
+                {
+                  "line": 32,
+                  "text": "Throws a 401 when the cookie is missing or old."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "s-save",
+          "title": "One save, from the editor to Postgres",
+          "text": "The sync client sends the whole note with the version it last saw. The API checks the session, then updates the row only if the version still matches. Search is told later, without waiting.",
+          "view": {
+            "type": "sequence",
+            "title": "Save a note",
+            "interaction": "save-note"
+          },
+          "callouts": [
+            {
+              "target": "message:save-note:m1",
+              "text": "The client sends the version it started from."
+            },
+            {
+              "target": "message:save-note:m5",
+              "text": "One UPDATE does the check and the write together."
+            },
+            {
+              "target": "message:save-note:m7",
+              "text": "Search is queued; the save does not wait for it."
+            }
+          ],
+          "trace": [
+            {
+              "ref": "message:save-note:m1",
+              "caption": "The client sends the edit and its version."
+            },
+            {
+              "ref": "message:save-note:m2",
+              "caption": "Routes find the user from the cookie."
+            },
+            {
+              "ref": "message:save-note:m4",
+              "caption": "Routes hand the edit to saveNote."
+            },
+            {
+              "ref": "message:save-note:m5",
+              "caption": "One UPDATE checks the version and writes."
+            },
+            {
+              "ref": "message:save-note:m7",
+              "caption": "Search is queued, without waiting."
+            },
+            {
+              "ref": "message:save-note:m11",
+              "caption": "The client gets the saved note back."
+            }
+          ],
+          "effects": [
+            {
+              "target": "message:save-note:m7",
+              "as": "flow"
+            }
+          ],
+          "badges": [
+            {
+              "target": "message:save-note:m5",
+              "text": "p95 12 ms"
+            }
+          ],
+          "code": [
+            {
+              "path": "api/src/notes/save.ts",
+              "title": "saveNote",
+              "start": 14,
+              "text": "  const rows = await db.query(\n    'UPDATE notes SET body = $1, version = version + 1 WHERE id = $2 AND version = $3 RETURNING *',\n    [edit.body, id, edit.version],\n  )\n  if (rows.length === 0) return { conflict: true, current: await findNote(id) }\n  await queueReindex(id)\n  return { note: rows[0] }",
+              "notes": [
+                {
+                  "line": 18,
+                  "text": "No row means another tab saved first."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "s-conflict",
+          "title": "Two tabs, one note: the version check",
+          "text": "When two tabs edit the same note, the second save finds no row with its version. The API answers 409 with the note as it is now, and the sync client shows both versions to the user.",
+          "risk": "look",
+          "view": {
+            "type": "sequence",
+            "title": "Save a note: a conflict",
+            "interaction": "save-note"
+          },
+          "focus": [
+            "message:save-note:m5",
+            "message:save-note:m9",
+            "message:save-note:m10",
+            "message:save-note:m11"
+          ],
+          "cases": [
+            {
+              "when": "The version matches",
+              "then": "The row is updated and the version goes up by one"
+            },
+            {
+              "when": "Another tab saved first",
+              "then": "409, with the current note",
+              "note": "Nothing is written."
+            }
+          ],
+          "proof": [
+            {
+              "text": "A stale version gets a 409 and changes nothing",
+              "source": "api/test/notes.test.ts",
+              "test": "returns 409 when the version is stale"
+            }
+          ],
+          "question": "Where would you change the code to merge the two versions on the server?"
+        },
+        {
+          "id": "s-search",
+          "title": "Search is updated later, not at once",
+          "text": "Saving only queues a re-index. A worker in the Search module updates the index a few seconds later. If the index is lost, a script rebuilds it from Postgres.",
+          "view": {
+            "type": "map",
+            "title": "Search",
+            "entities": [
+              "api",
+              "notes",
+              "search",
+              "db",
+              "index"
+            ]
+          },
+          "focus": [
+            "relationship:r-notes-search",
+            "relationship:r-search-index"
+          ],
+          "callouts": [
+            {
+              "target": "relationship:r-notes-search",
+              "text": "A queue in Postgres, not a message broker."
+            }
+          ],
+          "effects": [
+            {
+              "target": "relationship:r-notes-search",
+              "as": "flow"
+            },
+            {
+              "target": "relationship:r-search-index",
+              "as": "slow"
+            },
+            {
+              "target": "entity:index",
+              "as": "attention"
+            }
+          ],
+          "badges": [
+            {
+              "target": "relationship:r-search-index",
+              "text": "2–5 s behind"
+            },
+            {
+              "target": "entity:index",
+              "text": "120 k notes"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="112" height="112" viewBox="0 0 112 112" role="img" aria-labelledby="title description">
+<title id="title">Poney</title>
+<desc id="description">A P drawn as a diagram: a stem and a bowl in Sumi ink joining three nodes, the foot node in blade orange.</desc>
+<path d="M40 26V86M40 26H62A17 17 0 0 1 62 60H40" fill="none" stroke="#0a0a0b" stroke-width="6" stroke-linejoin="round"/>
+<rect x="28" y="16" width="24" height="20" rx="5" fill="#0a0a0b"/>
+<rect x="28" y="50" width="24" height="20" rx="5" fill="#0a0a0b"/>
+<rect x="28" y="76" width="24" height="20" rx="5" fill="#e84a1c"/>
+</svg>

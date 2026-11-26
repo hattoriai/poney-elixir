@@ -1,0 +1,113 @@
+{
+  "poneyVersion": "0.2.0",
+  "project": {
+    "id": "tiny",
+    "name": "Tiny",
+    "description": "The smallest useful document."
+  },
+  "model": {
+    "entities": [
+      {
+        "id": "user",
+        "kind": "person",
+        "name": "User",
+        "summary": "Uses the app."
+      },
+      {
+        "id": "app",
+        "kind": "web-app",
+        "name": "App",
+        "summary": "The app people use."
+      },
+      {
+        "id": "api",
+        "kind": "service",
+        "name": "API",
+        "summary": "Answers the app."
+      }
+    ],
+    "relationships": [
+      {
+        "id": "r-user-app",
+        "kind": "uses",
+        "source": "user",
+        "target": "app",
+        "label": "Uses"
+      },
+      {
+        "id": "r-app-api",
+        "kind": "calls",
+        "source": "app",
+        "target": "api",
+        "label": "Fetches data from",
+        "protocol": "HTTPS"
+      }
+    ],
+    "dataTypes": [
+      {
+        "id": "orders",
+        "kind": "table",
+        "name": "orders",
+        "summary": "Orders.",
+        "fields": [
+          {
+            "name": "status",
+            "type": "text"
+          }
+        ]
+      }
+    ],
+    "behaviors": [
+      {
+        "kind": "state-machine",
+        "id": "life",
+        "name": "Life",
+        "summary": "x",
+        "subject": "orders",
+        "states": [
+          {
+            "id": "a",
+            "kind": "initial",
+            "name": "A"
+          },
+          {
+            "id": "b",
+            "kind": "initial",
+            "name": "B"
+          },
+          {
+            "id": "c",
+            "kind": "final",
+            "name": "C"
+          }
+        ],
+        "transitions": [
+          {
+            "id": "t1",
+            "from": "a",
+            "to": "c",
+            "event": "Done"
+          }
+        ]
+      }
+    ]
+  },
+  "views": [
+    {
+      "id": "main",
+      "type": "architecture",
+      "title": "Main",
+      "description": "Everything.",
+      "category": "overview",
+      "entities": [
+        "user",
+        "app",
+        "api"
+      ]
+    }
+  ],
+  "presentation": {
+    "kinds": {},
+    "relationships": {}
+  }
+}

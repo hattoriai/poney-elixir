@@ -1,0 +1,101 @@
+{
+  "poneyVersion": "0.2.0",
+  "project": {
+    "id": "tiny",
+    "name": "Tiny",
+    "description": "The smallest useful document."
+  },
+  "model": {
+    "entities": [
+      {
+        "id": "user",
+        "kind": "person",
+        "name": "User",
+        "summary": "Uses the app."
+      },
+      {
+        "id": "app",
+        "kind": "web-app",
+        "name": "App",
+        "summary": "The app people use."
+      },
+      {
+        "id": "api",
+        "kind": "service",
+        "name": "API",
+        "summary": "Answers the app."
+      }
+    ],
+    "relationships": [
+      {
+        "id": "r-user-app",
+        "kind": "uses",
+        "source": "user",
+        "target": "app",
+        "label": "Uses"
+      },
+      {
+        "id": "r-app-api",
+        "kind": "calls",
+        "source": "app",
+        "target": "api",
+        "label": "Fetches data from",
+        "protocol": "HTTPS"
+      }
+    ]
+  },
+  "views": [
+    {
+      "id": "main",
+      "type": "architecture",
+      "title": "Main",
+      "description": "Everything.",
+      "category": "overview",
+      "entities": [
+        "user",
+        "app",
+        "api"
+      ]
+    }
+  ],
+  "presentation": {
+    "kinds": {},
+    "relationships": {}
+  },
+  "walkthroughs": [
+    {
+      "id": "w",
+      "title": "Add an API",
+      "summary": "The app now fetches data.",
+      "story": {
+        "text": "x",
+        "before": "a",
+        "after": "b"
+      },
+      "marks": [
+        {
+          "ref": "entity:api",
+          "state": "new"
+        }
+      ],
+      "scenes": [
+        {
+          "id": "s1",
+          "title": "The call",
+          "text": "The app calls the API.",
+          "view": "main",
+          "focus": [
+            "entity:app",
+            "entity:api"
+          ],
+          "callouts": [
+            {
+              "target": "relationship:r-app-api",
+              "text": "New call"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

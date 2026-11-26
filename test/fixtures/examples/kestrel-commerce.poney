@@ -1,0 +1,6132 @@
+{
+  "poneyVersion": "0.2.0",
+  "project": {
+    "id": "kestrel-commerce",
+    "name": "Kestrel Commerce",
+    "description": "An online store built from small services. Customers browse, fill a cart and check out; the platform reserves stock, takes payment through Paystream, and emails the customer. Operators manage products, stock and fulfilment from the back office.",
+    "repository": "github.com/kestrel/commerce",
+    "defaultView": "architecture"
+  },
+  "extensions": [
+    {
+      "name": "ownership",
+      "version": "0.1.0",
+      "required": false
+    }
+  ],
+  "model": {
+    "entities": [
+      {
+        "id": "customer",
+        "kind": "person",
+        "name": "Customer",
+        "summary": "Browses the catalog, buys products and tracks orders.",
+        "description": "Anyone shopping on the Kestrel storefront, signed in or not. Guests can browse and fill a cart; checkout needs an account.",
+        "tags": [],
+        "sourceRefs": [],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "store-operator",
+        "kind": "person",
+        "name": "Store operator",
+        "summary": "Runs the store: products, prices, stock and fulfilment.",
+        "description": "Members of the operations team who work in the back office every day.",
+        "tags": [],
+        "sourceRefs": [],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "kestrel",
+        "kind": "system",
+        "name": "Kestrel Commerce",
+        "summary": "The online store: catalog, carts, checkout, payments and fulfilment.",
+        "description": "A set of small services behind one API gateway. Each service owns its data. Services talk synchronously over gRPC for requests that need an answer now, and through the event bus for everything that can happen later.",
+        "tags": [],
+        "sourceRefs": [
+          {
+            "path": "README.md",
+            "repository": "github.com/kestrel/commerce"
+          }
+        ],
+        "metadata": {},
+        "ext": {
+          "ownership": {
+            "team": "team-platform"
+          }
+        }
+      },
+      {
+        "id": "storefront",
+        "kind": "web-app",
+        "name": "Storefront",
+        "summary": "The shop customers see: product pages, cart and checkout.",
+        "parent": "kestrel",
+        "technology": "Next.js 15",
+        "tags": [
+          "customer-facing"
+        ],
+        "sourceRefs": [
+          {
+            "path": "apps/storefront/app/layout.tsx",
+            "repository": "github.com/kestrel/commerce"
+          }
+        ],
+        "metadata": {},
+        "ext": {
+          "ownership": {
+            "team": "team-web"
+          }
+        }
+      },
+      {
+        "id": "back-office",
+        "kind": "web-app",
+        "name": "Back office",
+        "summary": "Internal tool to manage products, stock, orders and refunds.",
+        "parent": "kestrel",
+        "technology": "React · Vite",
+        "tags": [
+          "internal"
+        ],
+        "sourceRefs": [
+          {
+            "path": "apps/back-office/src/main.tsx",
+            "repository": "github.com/kestrel/commerce"
+          }
+        ],
+        "metadata": {},
+        "ext": {
+          "ownership": {
+            "team": "team-ops-tooling"
+          }
+        }
+      },
+      {
+        "id": "api-gateway",
+        "kind": "gateway",
+        "name": "API gateway",
+        "summary": "One public entry point. Checks sessions and routes requests.",
+        "description": "Terminates TLS, applies rate limits, asks the auth service to verify the session on every request, and forwards the call to the owning service.",
+        "parent": "kestrel",
+        "technology": "Envoy",
+        "tags": [],
+        "sourceRefs": [
+          {
+            "path": "infra/gateway/envoy.yaml",
+            "repository": "github.com/kestrel/commerce"
+          }
+        ],
+        "metadata": {},
+        "ext": {
+          "ownership": {
+            "team": "team-platform"
+          }
+        }
+      },
+      {
+        "id": "auth-service",
+        "kind": "service",
+        "name": "Auth service",
+        "summary": "Signs customers in and keeps their sessions.",
+        "description": "Stores accounts and password hashes, creates sessions, and verifies session tokens for the gateway. Active sessions are cached in Redis so verification takes under a millisecond.",
+        "parent": "kestrel",
+        "technology": "Go",
+        "tags": [
+          "security"
+        ],
+        "sourceRefs": [
+          {
+            "path": "services/auth/cmd/auth/main.go",
+            "repository": "github.com/kestrel/commerce"
+          },
+          {
+            "path": "services/auth/internal/sessions/service.go",
+            "line": 42,
+            "symbol": "CreateSession",
+            "repository": "github.com/kestrel/commerce"
+          }
+        ],
+        "metadata": {},
+        "ext": {
+          "ownership": {
+            "team": "team-identity"
+          }
+        }
+      },
+      {
+        "id": "catalog-service",
+        "kind": "service",
+        "name": "Catalog service",
+        "summary": "Products, categories and prices.",
+        "description": "The source of truth for what the store sells and for how much. Product pages are cached in Redis.",
+        "parent": "kestrel",
+        "technology": "Kotlin · Spring Boot",
+        "tags": [],
+        "sourceRefs": [
+          {
+            "path": "services/catalog/src/main/kotlin/CatalogApplication.kt",
+            "repository": "github.com/kestrel/commerce"
+          }
+        ],
+        "metadata": {},
+        "ext": {
+          "ownership": {
+            "team": "team-catalog"
+          }
+        }
+      },
+      {
+        "id": "cart-service",
+        "kind": "service",
+        "name": "Cart service",
+        "summary": "Keeps each shopper’s cart and its current prices.",
+        "description": "Carts live in Redis for 30 days. Prices are refreshed from the catalog whenever the cart is read.",
+        "parent": "kestrel",
+        "technology": "Node.js · TypeScript",
+        "tags": [],
+        "sourceRefs": [
+          {
+            "path": "services/cart/src/server.ts",
+            "repository": "github.com/kestrel/commerce"
+          }
+        ],
+        "metadata": {},
+        "ext": {
+          "ownership": {
+            "team": "team-web"
+          }
+        }
+      },
+      {
+        "id": "order-service",
+        "kind": "service",
+        "name": "Order service",
+        "summary": "Runs checkout and owns every order from start to delivery.",
+        "description": "Orchestrates checkout: it validates the cart, reserves stock, asks for payment and confirms the order. It owns the order lifecycle and publishes order events through a transactional outbox.",
+        "parent": "kestrel",
+        "technology": "Go",
+        "tags": [
+          "critical-path"
+        ],
+        "sourceRefs": [
+          {
+            "path": "services/orders/cmd/orders/main.go",
+            "repository": "github.com/kestrel/commerce"
+          },
+          {
+            "path": "services/orders/internal/checkout/orchestrator.go",
+            "line": 61,
+            "symbol": "Orchestrator.Checkout",
+            "repository": "github.com/kestrel/commerce"
+          }
+        ],
+        "metadata": {},
+        "ext": {
+          "ownership": {
+            "team": "team-checkout"
+          }
+        }
+      },
+      {
+        "id": "payment-service",
+        "kind": "service",
+        "name": "Payment service",
+        "summary": "Authorizes, captures and refunds payments through Paystream.",
+        "description": "The only service that talks to the payment provider. It never stores card numbers — only Paystream tokens and references. It receives provider webhooks and reports results back to the order service.",
+        "parent": "kestrel",
+        "technology": "Go",
+        "tags": [
+          "pci-scope",
+          "critical-path"
+        ],
+        "sourceRefs": [
+          {
+            "path": "services/payments/internal/authorize.go",
+            "line": 28,
+            "symbol": "Authorize",
+            "repository": "github.com/kestrel/commerce"
+          },
+          {
+            "path": "services/payments/internal/webhooks/handler.go",
+            "repository": "github.com/kestrel/commerce"
+          }
+        ],
+        "metadata": {},
+        "ext": {
+          "ownership": {
+            "team": "team-payments"
+          }
+        }
+      },
+      {
+        "id": "inventory-service",
+        "kind": "service",
+        "name": "Inventory service",
+        "summary": "Tracks stock and holds items while a customer pays.",
+        "description": "Reservations hold stock for 15 minutes during checkout. A paid order commits them; a cancelled order releases them.",
+        "parent": "kestrel",
+        "technology": "Kotlin · Spring Boot",
+        "tags": [],
+        "sourceRefs": [
+          {
+            "path": "services/inventory/src/main/kotlin/reservations/ReservationService.kt",
+            "repository": "github.com/kestrel/commerce"
+          }
+        ],
+        "metadata": {},
+        "ext": {
+          "ownership": {
+            "team": "team-fulfilment"
+          }
+        }
+      },
+      {
+        "id": "notification-service",
+        "kind": "service",
+        "name": "Notification service",
+        "summary": "Sends order confirmations and shipping updates by email.",
+        "parent": "kestrel",
+        "technology": "Node.js · TypeScript",
+        "tags": [],
+        "sourceRefs": [
+          {
+            "path": "services/notifications/src/consumers/orders.ts",
+            "repository": "github.com/kestrel/commerce"
+          }
+        ],
+        "metadata": {},
+        "ext": {
+          "ownership": {
+            "team": "team-web"
+          }
+        }
+      },
+      {
+        "id": "retry-worker",
+        "kind": "service",
+        "name": "Retry window worker",
+        "summary": "Gives held stock back when a payment retry window closes.",
+        "description": "Runs every minute. Finds orders in Payment failed whose 30-minute window has closed, cancels them, releases their reservations and publishes OrderCancelled.",
+        "parent": "kestrel",
+        "technology": "Go",
+        "tags": [],
+        "sourceRefs": [
+          {
+            "path": "services/orders/cmd/retry-window/main.go",
+            "repository": "github.com/kestrel/commerce"
+          }
+        ],
+        "metadata": {},
+        "ext": {
+          "ownership": {
+            "team": "team-checkout"
+          }
+        }
+      },
+      {
+        "id": "identity-db",
+        "kind": "database",
+        "name": "Identity database",
+        "summary": "Accounts and sessions.",
+        "parent": "kestrel",
+        "technology": "PostgreSQL 16",
+        "tags": [],
+        "sourceRefs": [],
+        "metadata": {},
+        "ext": {
+          "ownership": {
+            "team": "team-identity"
+          }
+        }
+      },
+      {
+        "id": "catalog-db",
+        "kind": "database",
+        "name": "Catalog database",
+        "summary": "Products and categories.",
+        "parent": "kestrel",
+        "technology": "PostgreSQL 16",
+        "tags": [],
+        "sourceRefs": [],
+        "metadata": {},
+        "ext": {
+          "ownership": {
+            "team": "team-catalog"
+          }
+        }
+      },
+      {
+        "id": "order-db",
+        "kind": "database",
+        "name": "Order database",
+        "summary": "Orders, line items and the event outbox.",
+        "parent": "kestrel",
+        "technology": "PostgreSQL 16",
+        "tags": [],
+        "sourceRefs": [],
+        "metadata": {},
+        "ext": {
+          "ownership": {
+            "team": "team-checkout"
+          }
+        }
+      },
+      {
+        "id": "payment-db",
+        "kind": "database",
+        "name": "Payment database",
+        "summary": "Payment attempts and provider references.",
+        "parent": "kestrel",
+        "technology": "PostgreSQL 16",
+        "tags": [
+          "pci-scope"
+        ],
+        "sourceRefs": [],
+        "metadata": {},
+        "ext": {
+          "ownership": {
+            "team": "team-payments"
+          }
+        }
+      },
+      {
+        "id": "inventory-db",
+        "kind": "database",
+        "name": "Inventory database",
+        "summary": "Stock levels and reservations.",
+        "parent": "kestrel",
+        "technology": "PostgreSQL 16",
+        "tags": [],
+        "sourceRefs": [],
+        "metadata": {},
+        "ext": {
+          "ownership": {
+            "team": "team-fulfilment"
+          }
+        }
+      },
+      {
+        "id": "redis",
+        "kind": "cache",
+        "name": "Redis cache",
+        "summary": "Sessions, carts and cached product pages.",
+        "parent": "kestrel",
+        "technology": "Redis 7",
+        "tags": [],
+        "sourceRefs": [],
+        "metadata": {},
+        "ext": {
+          "ownership": {
+            "team": "team-platform"
+          }
+        }
+      },
+      {
+        "id": "event-bus",
+        "kind": "message-broker",
+        "name": "Event bus",
+        "summary": "Carries order events to the services that react to them.",
+        "parent": "kestrel",
+        "technology": "NATS JetStream",
+        "tags": [],
+        "sourceRefs": [],
+        "metadata": {},
+        "ext": {
+          "ownership": {
+            "team": "team-platform"
+          }
+        }
+      },
+      {
+        "id": "paystream",
+        "kind": "external",
+        "name": "Paystream",
+        "summary": "Card payment provider. Authorizes, captures and refunds.",
+        "description": "A third-party payment processor. Holds all card data so Kestrel never has to.",
+        "technology": "REST API · webhooks",
+        "tags": [],
+        "sourceRefs": [],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "postbox",
+        "kind": "external",
+        "name": "Postbox",
+        "summary": "Transactional email delivery.",
+        "technology": "REST API",
+        "tags": [],
+        "sourceRefs": [],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "order-api",
+        "kind": "component",
+        "name": "HTTP API",
+        "summary": "gRPC and HTTP handlers for checkout and order queries.",
+        "parent": "order-service",
+        "technology": "connect-go",
+        "tags": [],
+        "sourceRefs": [
+          {
+            "path": "services/orders/internal/api/handlers.go",
+            "repository": "github.com/kestrel/commerce"
+          }
+        ],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "checkout-orchestrator",
+        "kind": "component",
+        "name": "Checkout orchestrator",
+        "summary": "Runs the checkout steps in order and undoes them on failure.",
+        "parent": "order-service",
+        "tags": [],
+        "sourceRefs": [
+          {
+            "path": "services/orders/internal/checkout/orchestrator.go",
+            "line": 61,
+            "repository": "github.com/kestrel/commerce"
+          }
+        ],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "event-publisher",
+        "kind": "component",
+        "name": "Outbox publisher",
+        "summary": "Reads the outbox table and publishes events to the bus.",
+        "parent": "order-service",
+        "tags": [],
+        "sourceRefs": [
+          {
+            "path": "services/orders/internal/outbox/publisher.go",
+            "repository": "github.com/kestrel/commerce"
+          }
+        ],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "order-domain",
+        "kind": "component",
+        "name": "Order domain",
+        "summary": "The order aggregate and its lifecycle rules.",
+        "parent": "order-service",
+        "tags": [],
+        "sourceRefs": [
+          {
+            "path": "services/orders/internal/domain/order.go",
+            "line": 18,
+            "symbol": "Order",
+            "repository": "github.com/kestrel/commerce"
+          }
+        ],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "pricing",
+        "kind": "component",
+        "name": "Pricing",
+        "summary": "Calculates subtotals, tax and shipping.",
+        "parent": "order-service",
+        "tags": [],
+        "sourceRefs": [
+          {
+            "path": "services/orders/internal/pricing/totals.go",
+            "repository": "github.com/kestrel/commerce"
+          }
+        ],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "payment-port",
+        "kind": "interface",
+        "name": "PaymentGateway",
+        "summary": "What checkout needs from payments: authorize and void.",
+        "parent": "order-service",
+        "tags": [],
+        "sourceRefs": [
+          {
+            "path": "services/orders/internal/domain/ports.go",
+            "line": 9,
+            "symbol": "PaymentGateway",
+            "repository": "github.com/kestrel/commerce"
+          }
+        ],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "inventory-port",
+        "kind": "interface",
+        "name": "StockReservations",
+        "summary": "What checkout needs from inventory: reserve and release.",
+        "parent": "order-service",
+        "tags": [],
+        "sourceRefs": [
+          {
+            "path": "services/orders/internal/domain/ports.go",
+            "line": 21,
+            "symbol": "StockReservations",
+            "repository": "github.com/kestrel/commerce"
+          }
+        ],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "order-repository",
+        "kind": "interface",
+        "name": "OrderRepository",
+        "summary": "Loads and saves orders together with their outbox events.",
+        "parent": "order-service",
+        "tags": [],
+        "sourceRefs": [
+          {
+            "path": "services/orders/internal/domain/ports.go",
+            "line": 33,
+            "symbol": "OrderRepository",
+            "repository": "github.com/kestrel/commerce"
+          }
+        ],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "payment-client",
+        "kind": "component",
+        "name": "Payment client",
+        "summary": "gRPC client for the payment service.",
+        "parent": "order-service",
+        "tags": [],
+        "sourceRefs": [
+          {
+            "path": "services/orders/internal/adapters/payments/client.go",
+            "repository": "github.com/kestrel/commerce"
+          }
+        ],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "inventory-client",
+        "kind": "component",
+        "name": "Inventory client",
+        "summary": "gRPC client for the inventory service.",
+        "parent": "order-service",
+        "tags": [],
+        "sourceRefs": [
+          {
+            "path": "services/orders/internal/adapters/inventory/client.go",
+            "repository": "github.com/kestrel/commerce"
+          }
+        ],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "postgres-repository",
+        "kind": "component",
+        "name": "Postgres repository",
+        "summary": "Stores orders and outbox rows in one transaction.",
+        "parent": "order-service",
+        "technology": "pgx",
+        "tags": [],
+        "sourceRefs": [
+          {
+            "path": "services/orders/internal/adapters/postgres/orders.go",
+            "repository": "github.com/kestrel/commerce"
+          }
+        ],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "lib-money",
+        "kind": "library",
+        "name": "kestrel/money",
+        "summary": "Integer money amounts with currency. No floats.",
+        "tags": [],
+        "sourceRefs": [
+          {
+            "path": "libs/money/money.go",
+            "repository": "github.com/kestrel/commerce"
+          }
+        ],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "lib-telemetry",
+        "kind": "library",
+        "name": "kestrel/telemetry",
+        "summary": "Tracing, metrics and structured logs.",
+        "tags": [],
+        "sourceRefs": [
+          {
+            "path": "libs/telemetry/telemetry.go",
+            "repository": "github.com/kestrel/commerce"
+          }
+        ],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "team-web",
+        "kind": "ownership/team",
+        "name": "Web team",
+        "summary": "The storefront, carts and the emails customers read.",
+        "tags": [],
+        "sourceRefs": [],
+        "metadata": {},
+        "ext": {
+          "ownership": {
+            "mission": "The storefront, carts and the emails customers read.",
+            "oncall": "web-primary",
+            "channel": "#team-web"
+          }
+        }
+      },
+      {
+        "id": "team-ops-tooling",
+        "kind": "ownership/team",
+        "name": "Operations tooling",
+        "summary": "The back office the operations team works in.",
+        "tags": [],
+        "sourceRefs": [],
+        "metadata": {},
+        "ext": {
+          "ownership": {
+            "mission": "The back office the operations team works in.",
+            "oncall": "ops-tooling",
+            "channel": "#ops-tooling"
+          }
+        }
+      },
+      {
+        "id": "team-identity",
+        "kind": "ownership/team",
+        "name": "Identity team",
+        "summary": "Accounts, sign-in and sessions.",
+        "tags": [],
+        "sourceRefs": [],
+        "metadata": {},
+        "ext": {
+          "ownership": {
+            "mission": "Accounts, sign-in and sessions.",
+            "oncall": "identity-primary",
+            "channel": "#team-identity"
+          }
+        }
+      },
+      {
+        "id": "team-catalog",
+        "kind": "ownership/team",
+        "name": "Catalog team",
+        "summary": "Products, categories and prices.",
+        "tags": [],
+        "sourceRefs": [],
+        "metadata": {},
+        "ext": {
+          "ownership": {
+            "mission": "Products, categories and prices.",
+            "oncall": "catalog-primary",
+            "channel": "#team-catalog"
+          }
+        }
+      },
+      {
+        "id": "team-checkout",
+        "kind": "ownership/team",
+        "name": "Checkout team",
+        "summary": "Checkout and every order from start to delivery.",
+        "tags": [],
+        "sourceRefs": [],
+        "metadata": {},
+        "ext": {
+          "ownership": {
+            "mission": "Checkout and every order from start to delivery.",
+            "oncall": "checkout-primary",
+            "channel": "#team-checkout"
+          }
+        }
+      },
+      {
+        "id": "team-payments",
+        "kind": "ownership/team",
+        "name": "Payments team",
+        "summary": "Taking money safely, and giving it back.",
+        "tags": [],
+        "sourceRefs": [],
+        "metadata": {},
+        "ext": {
+          "ownership": {
+            "mission": "Taking money safely, and giving it back.",
+            "oncall": "payments-primary",
+            "channel": "#team-payments"
+          }
+        }
+      },
+      {
+        "id": "team-fulfilment",
+        "kind": "ownership/team",
+        "name": "Fulfilment team",
+        "summary": "Stock, reservations and shipping.",
+        "tags": [],
+        "sourceRefs": [],
+        "metadata": {},
+        "ext": {
+          "ownership": {
+            "mission": "Stock, reservations and shipping.",
+            "oncall": "fulfilment-primary",
+            "channel": "#team-fulfilment"
+          }
+        }
+      },
+      {
+        "id": "team-platform",
+        "kind": "ownership/team",
+        "name": "Platform team",
+        "summary": "The gateway, the event bus, the cache and the clusters.",
+        "tags": [],
+        "sourceRefs": [],
+        "metadata": {},
+        "ext": {
+          "ownership": {
+            "mission": "The gateway, the event bus, the cache and the clusters.",
+            "oncall": "platform-primary",
+            "channel": "#team-platform"
+          }
+        }
+      }
+    ],
+    "relationships": [
+      {
+        "id": "r-customer-storefront",
+        "kind": "uses",
+        "source": "customer",
+        "target": "storefront",
+        "label": "Shops on",
+        "protocol": "HTTPS",
+        "data": [],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "r-operator-backoffice",
+        "kind": "uses",
+        "source": "store-operator",
+        "target": "back-office",
+        "label": "Manages the store in",
+        "protocol": "HTTPS",
+        "data": [],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "r-storefront-gateway",
+        "kind": "calls",
+        "source": "storefront",
+        "target": "api-gateway",
+        "label": "Sends API requests",
+        "protocol": "HTTPS · JSON",
+        "data": [],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "r-backoffice-gateway",
+        "kind": "calls",
+        "source": "back-office",
+        "target": "api-gateway",
+        "label": "Sends admin requests",
+        "protocol": "HTTPS · JSON",
+        "data": [],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "r-gateway-auth",
+        "kind": "calls",
+        "source": "api-gateway",
+        "target": "auth-service",
+        "label": "Signs in and verifies sessions",
+        "description": "Every request with a session cookie is verified before it is routed. Sign-in requests are forwarded as-is.",
+        "protocol": "gRPC",
+        "data": [
+          "credentials",
+          "session-token"
+        ],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "r-gateway-catalog",
+        "kind": "calls",
+        "source": "api-gateway",
+        "target": "catalog-service",
+        "label": "Routes product queries",
+        "protocol": "gRPC",
+        "data": [],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "r-gateway-cart",
+        "kind": "calls",
+        "source": "api-gateway",
+        "target": "cart-service",
+        "label": "Routes cart changes",
+        "protocol": "gRPC",
+        "data": [],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "r-gateway-order",
+        "kind": "calls",
+        "source": "api-gateway",
+        "target": "order-service",
+        "label": "Routes checkout and orders",
+        "protocol": "gRPC",
+        "data": [
+          "checkout-request"
+        ],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "r-auth-identitydb",
+        "kind": "reads-writes",
+        "source": "auth-service",
+        "target": "identity-db",
+        "label": "Stores accounts and sessions",
+        "protocol": "SQL",
+        "data": [
+          "users",
+          "sessions"
+        ],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "r-auth-redis",
+        "kind": "reads-writes",
+        "source": "auth-service",
+        "target": "redis",
+        "label": "Caches active sessions",
+        "protocol": "RESP",
+        "data": [
+          "session-token"
+        ],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "r-catalog-catalogdb",
+        "kind": "reads-writes",
+        "source": "catalog-service",
+        "target": "catalog-db",
+        "label": "Stores products",
+        "protocol": "SQL",
+        "data": [
+          "products",
+          "categories"
+        ],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "r-catalog-redis",
+        "kind": "reads-writes",
+        "source": "catalog-service",
+        "target": "redis",
+        "label": "Caches product pages",
+        "protocol": "RESP",
+        "data": [],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "r-cart-redis",
+        "kind": "reads-writes",
+        "source": "cart-service",
+        "target": "redis",
+        "label": "Stores carts",
+        "protocol": "RESP",
+        "data": [
+          "cart-snapshot"
+        ],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "r-cart-catalog",
+        "kind": "calls",
+        "source": "cart-service",
+        "target": "catalog-service",
+        "label": "Looks up current prices",
+        "protocol": "gRPC",
+        "data": [],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "r-order-cart",
+        "kind": "calls",
+        "source": "order-service",
+        "target": "cart-service",
+        "label": "Reads the cart to check out",
+        "protocol": "gRPC",
+        "data": [
+          "cart-snapshot"
+        ],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "r-order-inventory",
+        "kind": "calls",
+        "source": "order-service",
+        "target": "inventory-service",
+        "label": "Reserves and releases stock",
+        "description": "Each line item is reserved separately so a partial failure can be undone line by line.",
+        "protocol": "gRPC",
+        "data": [
+          "reservation-request"
+        ],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "r-order-payment",
+        "kind": "calls",
+        "source": "order-service",
+        "target": "payment-service",
+        "label": "Asks for payment",
+        "description": "Authorization happens at checkout. Capture happens later, when the order ships.",
+        "protocol": "gRPC",
+        "data": [
+          "payment-authorization",
+          "payment-result"
+        ],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "r-order-orderdb",
+        "kind": "reads-writes",
+        "source": "order-service",
+        "target": "order-db",
+        "label": "Stores orders and outbox",
+        "protocol": "SQL",
+        "data": [
+          "orders",
+          "order-items",
+          "order-events"
+        ],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "r-order-eventbus",
+        "kind": "publishes",
+        "source": "order-service",
+        "target": "event-bus",
+        "label": "Publishes order events",
+        "protocol": "NATS",
+        "data": [
+          "order-confirmed"
+        ],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "r-payment-paystream",
+        "kind": "calls",
+        "source": "payment-service",
+        "target": "paystream",
+        "label": "Authorizes and captures cards",
+        "protocol": "HTTPS · REST",
+        "data": [
+          "payment-authorization",
+          "payment-result"
+        ],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "r-paystream-payment",
+        "kind": "calls",
+        "source": "paystream",
+        "target": "payment-service",
+        "label": "Sends payment webhooks",
+        "description": "Paystream reports late events, such as disputes and asynchronous 3-D Secure results, through signed webhooks.",
+        "protocol": "HTTPS webhook",
+        "data": [
+          "payment-webhook"
+        ],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "r-payment-paymentdb",
+        "kind": "reads-writes",
+        "source": "payment-service",
+        "target": "payment-db",
+        "label": "Records payment attempts",
+        "protocol": "SQL",
+        "data": [
+          "payments"
+        ],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "r-inventory-inventorydb",
+        "kind": "reads-writes",
+        "source": "inventory-service",
+        "target": "inventory-db",
+        "label": "Stores stock and reservations",
+        "protocol": "SQL",
+        "data": [
+          "stock-levels",
+          "reservations"
+        ],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "r-inventory-eventbus",
+        "kind": "subscribes",
+        "source": "inventory-service",
+        "target": "event-bus",
+        "label": "Commits or releases stock on order events",
+        "protocol": "NATS",
+        "data": [],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "r-notification-eventbus",
+        "kind": "subscribes",
+        "source": "notification-service",
+        "target": "event-bus",
+        "label": "Listens for order events",
+        "protocol": "NATS",
+        "data": [
+          "order-confirmed"
+        ],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "r-notification-postbox",
+        "kind": "calls",
+        "source": "notification-service",
+        "target": "postbox",
+        "label": "Sends email",
+        "protocol": "HTTPS · REST",
+        "data": [
+          "email-message"
+        ],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "r-retry-orderdb",
+        "kind": "reads-writes",
+        "source": "retry-worker",
+        "target": "order-db",
+        "label": "Finds closed windows",
+        "protocol": "SQL",
+        "data": [
+          "orders"
+        ],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "r-retry-inventory",
+        "kind": "calls",
+        "source": "retry-worker",
+        "target": "inventory-service",
+        "label": "Releases held stock",
+        "protocol": "gRPC",
+        "data": [
+          "reservation-request"
+        ],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "r-retry-eventbus",
+        "kind": "publishes",
+        "source": "retry-worker",
+        "target": "event-bus",
+        "label": "Publishes OrderCancelled",
+        "protocol": "NATS",
+        "data": [],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "d-api-checkout",
+        "kind": "depends-on",
+        "source": "order-api",
+        "target": "checkout-orchestrator",
+        "label": "Starts checkout",
+        "data": [],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "d-api-domain",
+        "kind": "depends-on",
+        "source": "order-api",
+        "target": "order-domain",
+        "label": "Reads orders",
+        "data": [],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "d-api-telemetry",
+        "kind": "depends-on",
+        "source": "order-api",
+        "target": "lib-telemetry",
+        "label": "Traces requests",
+        "data": [],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "d-checkout-domain",
+        "kind": "depends-on",
+        "source": "checkout-orchestrator",
+        "target": "order-domain",
+        "label": "Creates and updates orders",
+        "data": [],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "d-checkout-pricing",
+        "kind": "depends-on",
+        "source": "checkout-orchestrator",
+        "target": "pricing",
+        "label": "Calculates totals",
+        "data": [],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "d-checkout-paymentport",
+        "kind": "depends-on",
+        "source": "checkout-orchestrator",
+        "target": "payment-port",
+        "label": "Authorizes payment",
+        "data": [],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "d-checkout-inventoryport",
+        "kind": "depends-on",
+        "source": "checkout-orchestrator",
+        "target": "inventory-port",
+        "label": "Reserves stock",
+        "data": [],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "d-checkout-repo",
+        "kind": "depends-on",
+        "source": "checkout-orchestrator",
+        "target": "order-repository",
+        "label": "Saves orders",
+        "data": [],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "d-publisher-repo",
+        "kind": "depends-on",
+        "source": "event-publisher",
+        "target": "order-repository",
+        "label": "Reads unpublished events",
+        "data": [],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "d-publisher-telemetry",
+        "kind": "depends-on",
+        "source": "event-publisher",
+        "target": "lib-telemetry",
+        "label": "Reports publish lag",
+        "data": [],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "d-domain-money",
+        "kind": "depends-on",
+        "source": "order-domain",
+        "target": "lib-money",
+        "label": "Uses money amounts",
+        "data": [],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "d-pricing-money",
+        "kind": "depends-on",
+        "source": "pricing",
+        "target": "lib-money",
+        "label": "Uses money amounts",
+        "data": [],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "d-pricing-domain",
+        "kind": "depends-on",
+        "source": "pricing",
+        "target": "order-domain",
+        "label": "Reads line items",
+        "data": [],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "d-repo-domain",
+        "kind": "depends-on",
+        "source": "order-repository",
+        "target": "order-domain",
+        "label": "Loads and saves orders",
+        "data": [],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "i-paymentclient",
+        "kind": "implements",
+        "source": "payment-client",
+        "target": "payment-port",
+        "label": "Implements",
+        "data": [],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "i-inventoryclient",
+        "kind": "implements",
+        "source": "inventory-client",
+        "target": "inventory-port",
+        "label": "Implements",
+        "data": [],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "i-pgrepo",
+        "kind": "implements",
+        "source": "postgres-repository",
+        "target": "order-repository",
+        "label": "Implements",
+        "data": [],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "d-paymentclient-telemetry",
+        "kind": "depends-on",
+        "source": "payment-client",
+        "target": "lib-telemetry",
+        "label": "Traces calls",
+        "data": [],
+        "metadata": {},
+        "ext": {}
+      },
+      {
+        "id": "d-inventoryclient-telemetry",
+        "kind": "depends-on",
+        "source": "inventory-client",
+        "target": "lib-telemetry",
+        "label": "Traces calls",
+        "data": [],
+        "metadata": {},
+        "ext": {}
+      }
+    ],
+    "dataTypes": [
+      {
+        "id": "users",
+        "kind": "table",
+        "name": "users",
+        "summary": "One row per customer account.",
+        "fields": [
+          {
+            "name": "id",
+            "type": "uuid",
+            "primaryKey": true,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "email",
+            "type": "citext",
+            "description": "Case-insensitive sign-in email.",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": true
+          },
+          {
+            "name": "password_hash",
+            "type": "text",
+            "description": "argon2id hash. The password itself is never stored.",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "display_name",
+            "type": "text",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "status",
+            "type": "user_status",
+            "description": "active, locked or closed.",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "failed_attempts",
+            "type": "smallint",
+            "description": "Resets on a successful sign-in. Five locks the account.",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "locked_until",
+            "type": "timestamptz",
+            "primaryKey": false,
+            "nullable": true,
+            "unique": false
+          },
+          {
+            "name": "created_at",
+            "type": "timestamptz",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          }
+        ],
+        "ownedBy": "auth-service",
+        "storedIn": "identity-db",
+        "sourceRefs": [
+          {
+            "path": "services/auth/migrations/0001_users.sql",
+            "repository": "github.com/kestrel/commerce"
+          }
+        ],
+        "ext": {}
+      },
+      {
+        "id": "sessions",
+        "kind": "table",
+        "name": "sessions",
+        "summary": "Signed-in sessions. Mirrored in Redis while active.",
+        "fields": [
+          {
+            "name": "id",
+            "type": "uuid",
+            "primaryKey": true,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "user_id",
+            "type": "uuid",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false,
+            "references": {
+              "dataType": "users",
+              "field": "id"
+            }
+          },
+          {
+            "name": "token_hash",
+            "type": "bytea",
+            "description": "SHA-256 of the session token.",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": true
+          },
+          {
+            "name": "expires_at",
+            "type": "timestamptz",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "ip_address",
+            "type": "inet",
+            "primaryKey": false,
+            "nullable": true,
+            "unique": false
+          },
+          {
+            "name": "user_agent",
+            "type": "text",
+            "primaryKey": false,
+            "nullable": true,
+            "unique": false
+          },
+          {
+            "name": "created_at",
+            "type": "timestamptz",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          }
+        ],
+        "ownedBy": "auth-service",
+        "storedIn": "identity-db",
+        "sourceRefs": [],
+        "ext": {}
+      },
+      {
+        "id": "categories",
+        "kind": "table",
+        "name": "categories",
+        "summary": "The navigation tree of the store.",
+        "fields": [
+          {
+            "name": "id",
+            "type": "uuid",
+            "primaryKey": true,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "name",
+            "type": "text",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "slug",
+            "type": "text",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": true
+          },
+          {
+            "name": "position",
+            "type": "int",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          }
+        ],
+        "ownedBy": "catalog-service",
+        "storedIn": "catalog-db",
+        "sourceRefs": [],
+        "ext": {}
+      },
+      {
+        "id": "products",
+        "kind": "table",
+        "name": "products",
+        "summary": "Everything the store sells.",
+        "fields": [
+          {
+            "name": "id",
+            "type": "uuid",
+            "primaryKey": true,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "sku",
+            "type": "text",
+            "description": "Stock keeping unit, shared with the warehouse.",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": true
+          },
+          {
+            "name": "category_id",
+            "type": "uuid",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false,
+            "references": {
+              "dataType": "categories",
+              "field": "id"
+            }
+          },
+          {
+            "name": "name",
+            "type": "text",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "slug",
+            "type": "text",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": true
+          },
+          {
+            "name": "description",
+            "type": "text",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "price_cents",
+            "type": "integer",
+            "description": "Current price in minor units.",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "currency",
+            "type": "char(3)",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "status",
+            "type": "product_status",
+            "description": "draft, live or retired.",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "updated_at",
+            "type": "timestamptz",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          }
+        ],
+        "ownedBy": "catalog-service",
+        "storedIn": "catalog-db",
+        "sourceRefs": [],
+        "ext": {}
+      },
+      {
+        "id": "orders",
+        "kind": "table",
+        "name": "orders",
+        "summary": "One row per order, with its totals and lifecycle status.",
+        "fields": [
+          {
+            "name": "id",
+            "type": "uuid",
+            "primaryKey": true,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "number",
+            "type": "text",
+            "description": "Customer-facing number, e.g. K-48213.",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": true
+          },
+          {
+            "name": "customer_id",
+            "type": "uuid",
+            "description": "Logical reference to users.id in the identity database.",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "status",
+            "type": "order_status",
+            "description": "See the order lifecycle.",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "subtotal_cents",
+            "type": "integer",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "tax_cents",
+            "type": "integer",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "shipping_cents",
+            "type": "integer",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "total_cents",
+            "type": "integer",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "currency",
+            "type": "char(3)",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "shipping_address",
+            "type": "jsonb",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "payment_attempts",
+            "type": "smallint",
+            "description": "Declined cards so far. Three cancel the order.",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "retry_until",
+            "type": "timestamptz",
+            "description": "End of the retry window, while the payment failed.",
+            "primaryKey": false,
+            "nullable": true,
+            "unique": false
+          },
+          {
+            "name": "placed_at",
+            "type": "timestamptz",
+            "primaryKey": false,
+            "nullable": true,
+            "unique": false
+          },
+          {
+            "name": "updated_at",
+            "type": "timestamptz",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          }
+        ],
+        "ownedBy": "order-service",
+        "storedIn": "order-db",
+        "sourceRefs": [
+          {
+            "path": "services/orders/migrations/0001_orders.sql",
+            "repository": "github.com/kestrel/commerce"
+          }
+        ],
+        "ext": {}
+      },
+      {
+        "id": "order-items",
+        "kind": "table",
+        "name": "order_items",
+        "summary": "The lines of an order, with prices frozen at checkout.",
+        "fields": [
+          {
+            "name": "id",
+            "type": "uuid",
+            "primaryKey": true,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "order_id",
+            "type": "uuid",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false,
+            "references": {
+              "dataType": "orders",
+              "field": "id"
+            }
+          },
+          {
+            "name": "product_id",
+            "type": "uuid",
+            "description": "Logical reference to products.id.",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "sku",
+            "type": "text",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "quantity",
+            "type": "integer",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "unit_price_cents",
+            "type": "integer",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "line_total_cents",
+            "type": "integer",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          }
+        ],
+        "ownedBy": "order-service",
+        "storedIn": "order-db",
+        "sourceRefs": [],
+        "ext": {}
+      },
+      {
+        "id": "order-events",
+        "kind": "table",
+        "name": "order_events",
+        "summary": "Transactional outbox. Rows are published to the event bus.",
+        "fields": [
+          {
+            "name": "id",
+            "type": "uuid",
+            "primaryKey": true,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "order_id",
+            "type": "uuid",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false,
+            "references": {
+              "dataType": "orders",
+              "field": "id"
+            }
+          },
+          {
+            "name": "type",
+            "type": "text",
+            "description": "For example OrderConfirmed or OrderCancelled.",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "payload",
+            "type": "jsonb",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "published_at",
+            "type": "timestamptz",
+            "primaryKey": false,
+            "nullable": true,
+            "unique": false
+          },
+          {
+            "name": "created_at",
+            "type": "timestamptz",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          }
+        ],
+        "ownedBy": "order-service",
+        "storedIn": "order-db",
+        "sourceRefs": [],
+        "ext": {}
+      },
+      {
+        "id": "payments",
+        "kind": "table",
+        "name": "payments",
+        "summary": "Every authorization, capture and refund attempt.",
+        "fields": [
+          {
+            "name": "id",
+            "type": "uuid",
+            "primaryKey": true,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "order_id",
+            "type": "uuid",
+            "description": "Logical reference to orders.id.",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "provider_ref",
+            "type": "text",
+            "description": "Paystream payment intent id.",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": true
+          },
+          {
+            "name": "status",
+            "type": "payment_status",
+            "description": "authorized, declined, captured, refunded.",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "amount_cents",
+            "type": "integer",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "currency",
+            "type": "char(3)",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "failure_reason",
+            "type": "text",
+            "primaryKey": false,
+            "nullable": true,
+            "unique": false
+          },
+          {
+            "name": "authorized_at",
+            "type": "timestamptz",
+            "primaryKey": false,
+            "nullable": true,
+            "unique": false
+          },
+          {
+            "name": "captured_at",
+            "type": "timestamptz",
+            "primaryKey": false,
+            "nullable": true,
+            "unique": false
+          }
+        ],
+        "ownedBy": "payment-service",
+        "storedIn": "payment-db",
+        "sourceRefs": [],
+        "ext": {}
+      },
+      {
+        "id": "stock-levels",
+        "kind": "table",
+        "name": "stock_levels",
+        "summary": "How many of each product are on hand and held.",
+        "fields": [
+          {
+            "name": "product_id",
+            "type": "uuid",
+            "description": "Logical reference to products.id.",
+            "primaryKey": true,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "on_hand",
+            "type": "integer",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "reserved",
+            "type": "integer",
+            "description": "Held by open reservations. Available = on_hand − reserved.",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "updated_at",
+            "type": "timestamptz",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          }
+        ],
+        "ownedBy": "inventory-service",
+        "storedIn": "inventory-db",
+        "sourceRefs": [],
+        "ext": {}
+      },
+      {
+        "id": "reservations",
+        "kind": "table",
+        "name": "reservations",
+        "summary": "Stock held for an order while the customer pays.",
+        "fields": [
+          {
+            "name": "id",
+            "type": "uuid",
+            "primaryKey": true,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "order_id",
+            "type": "uuid",
+            "description": "Logical reference to orders.id.",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "product_id",
+            "type": "uuid",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false,
+            "references": {
+              "dataType": "stock-levels",
+              "field": "product_id"
+            }
+          },
+          {
+            "name": "quantity",
+            "type": "integer",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "status",
+            "type": "reservation_status",
+            "description": "held, committed or released.",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "expires_at",
+            "type": "timestamptz",
+            "description": "15 minutes after creation.",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          }
+        ],
+        "ownedBy": "inventory-service",
+        "storedIn": "inventory-db",
+        "sourceRefs": [],
+        "ext": {}
+      },
+      {
+        "id": "credentials",
+        "kind": "record",
+        "name": "Credentials",
+        "summary": "Email and password typed by the customer.",
+        "fields": [
+          {
+            "name": "email",
+            "type": "string",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "password",
+            "type": "string",
+            "description": "Only in transit, over TLS.",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          }
+        ],
+        "sourceRefs": [],
+        "ext": {}
+      },
+      {
+        "id": "session-token",
+        "kind": "record",
+        "name": "Session token",
+        "summary": "Opaque token that proves who the customer is.",
+        "fields": [
+          {
+            "name": "token",
+            "type": "string",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "user_id",
+            "type": "uuid",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "expires_at",
+            "type": "timestamp",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          }
+        ],
+        "ownedBy": "auth-service",
+        "sourceRefs": [],
+        "ext": {}
+      },
+      {
+        "id": "checkout-request",
+        "kind": "record",
+        "name": "Checkout request",
+        "summary": "What the customer submits when they place an order.",
+        "fields": [
+          {
+            "name": "cart_id",
+            "type": "uuid",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "shipping_address",
+            "type": "Address",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "payment_method_token",
+            "type": "string",
+            "description": "Paystream token. Card data never reaches Kestrel.",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          }
+        ],
+        "sourceRefs": [],
+        "ext": {}
+      },
+      {
+        "id": "cart-snapshot",
+        "kind": "document",
+        "name": "Cart snapshot",
+        "summary": "The cart’s lines with current prices.",
+        "fields": [
+          {
+            "name": "cart_id",
+            "type": "uuid",
+            "primaryKey": true,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "customer_id",
+            "type": "uuid",
+            "primaryKey": false,
+            "nullable": true,
+            "unique": false
+          },
+          {
+            "name": "lines",
+            "type": "CartLine[]",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "subtotal_cents",
+            "type": "integer",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "expires_at",
+            "type": "timestamp",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          }
+        ],
+        "ownedBy": "cart-service",
+        "storedIn": "redis",
+        "sourceRefs": [],
+        "ext": {}
+      },
+      {
+        "id": "reservation-request",
+        "kind": "record",
+        "name": "Reservation request",
+        "summary": "A request to hold stock for one order line.",
+        "fields": [
+          {
+            "name": "order_id",
+            "type": "uuid",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "product_id",
+            "type": "uuid",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "quantity",
+            "type": "integer",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          }
+        ],
+        "sourceRefs": [],
+        "ext": {}
+      },
+      {
+        "id": "payment-authorization",
+        "kind": "record",
+        "name": "Payment authorization",
+        "summary": "A request to hold the order total on the customer’s card.",
+        "fields": [
+          {
+            "name": "order_id",
+            "type": "uuid",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "amount_cents",
+            "type": "integer",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "currency",
+            "type": "string",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "payment_method_token",
+            "type": "string",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "idempotency_key",
+            "type": "string",
+            "description": "The order id plus the attempt number.",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          }
+        ],
+        "sourceRefs": [],
+        "ext": {}
+      },
+      {
+        "id": "payment-result",
+        "kind": "record",
+        "name": "Payment result",
+        "summary": "Whether the payment was authorized, and why not.",
+        "fields": [
+          {
+            "name": "status",
+            "type": "\"authorized\" | \"declined\"",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "provider_ref",
+            "type": "string",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "decline_code",
+            "type": "string",
+            "primaryKey": false,
+            "nullable": true,
+            "unique": false
+          }
+        ],
+        "sourceRefs": [],
+        "ext": {}
+      },
+      {
+        "id": "payment-webhook",
+        "kind": "event",
+        "name": "Payment webhook",
+        "summary": "A signed notification from Paystream about a payment.",
+        "fields": [
+          {
+            "name": "type",
+            "type": "string",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "provider_ref",
+            "type": "string",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "signature",
+            "type": "string",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          }
+        ],
+        "sourceRefs": [],
+        "ext": {}
+      },
+      {
+        "id": "order-confirmed",
+        "kind": "event",
+        "name": "OrderConfirmed",
+        "summary": "Published when an order is paid. Starts fulfilment and email.",
+        "fields": [
+          {
+            "name": "order_id",
+            "type": "uuid",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "number",
+            "type": "string",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "customer_email",
+            "type": "string",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "total_cents",
+            "type": "integer",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "lines",
+            "type": "OrderLine[]",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          }
+        ],
+        "ownedBy": "order-service",
+        "sourceRefs": [
+          {
+            "path": "services/orders/internal/domain/events.go",
+            "line": 12,
+            "symbol": "OrderConfirmed",
+            "repository": "github.com/kestrel/commerce"
+          }
+        ],
+        "ext": {}
+      },
+      {
+        "id": "email-message",
+        "kind": "record",
+        "name": "Email message",
+        "summary": "A rendered email ready for delivery.",
+        "fields": [
+          {
+            "name": "to",
+            "type": "string",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "template",
+            "type": "string",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "name": "variables",
+            "type": "object",
+            "primaryKey": false,
+            "nullable": false,
+            "unique": false
+          }
+        ],
+        "sourceRefs": [],
+        "ext": {}
+      }
+    ],
+    "dataRelations": [
+      {
+        "id": "rel-user-sessions",
+        "from": "users",
+        "to": "sessions",
+        "fromCardinality": "exactly-one",
+        "toCardinality": "zero-or-many",
+        "label": "has",
+        "via": "user_id",
+        "logical": false
+      },
+      {
+        "id": "rel-category-products",
+        "from": "categories",
+        "to": "products",
+        "fromCardinality": "exactly-one",
+        "toCardinality": "zero-or-many",
+        "label": "contains",
+        "via": "category_id",
+        "logical": false
+      },
+      {
+        "id": "rel-order-items",
+        "from": "orders",
+        "to": "order-items",
+        "fromCardinality": "exactly-one",
+        "toCardinality": "one-or-many",
+        "label": "is made of",
+        "via": "order_id",
+        "logical": false
+      },
+      {
+        "id": "rel-order-events",
+        "from": "orders",
+        "to": "order-events",
+        "fromCardinality": "exactly-one",
+        "toCardinality": "zero-or-many",
+        "label": "emits",
+        "via": "order_id",
+        "logical": false
+      },
+      {
+        "id": "rel-user-orders",
+        "from": "users",
+        "to": "orders",
+        "fromCardinality": "exactly-one",
+        "toCardinality": "zero-or-many",
+        "label": "places",
+        "via": "customer_id",
+        "logical": true
+      },
+      {
+        "id": "rel-product-items",
+        "from": "products",
+        "to": "order-items",
+        "fromCardinality": "exactly-one",
+        "toCardinality": "zero-or-many",
+        "label": "is bought as",
+        "via": "product_id",
+        "logical": true
+      },
+      {
+        "id": "rel-order-payments",
+        "from": "orders",
+        "to": "payments",
+        "fromCardinality": "exactly-one",
+        "toCardinality": "zero-or-many",
+        "label": "is paid by",
+        "via": "order_id",
+        "logical": true
+      },
+      {
+        "id": "rel-product-stock",
+        "from": "products",
+        "to": "stock-levels",
+        "fromCardinality": "exactly-one",
+        "toCardinality": "zero-or-one",
+        "label": "is stocked as",
+        "via": "product_id",
+        "logical": true
+      },
+      {
+        "id": "rel-stock-reservations",
+        "from": "stock-levels",
+        "to": "reservations",
+        "fromCardinality": "exactly-one",
+        "toCardinality": "zero-or-many",
+        "label": "is held by",
+        "via": "product_id",
+        "logical": false
+      },
+      {
+        "id": "rel-order-reservations",
+        "from": "orders",
+        "to": "reservations",
+        "fromCardinality": "exactly-one",
+        "toCardinality": "zero-or-many",
+        "label": "holds",
+        "via": "order_id",
+        "logical": true
+      }
+    ],
+    "dataFlows": [
+      {
+        "id": "f-customer-storefront",
+        "source": "customer",
+        "target": "storefront",
+        "data": [
+          "checkout-request"
+        ],
+        "label": "Address and payment method",
+        "via": "r-customer-storefront"
+      },
+      {
+        "id": "f-storefront-gateway",
+        "source": "storefront",
+        "target": "api-gateway",
+        "data": [
+          "checkout-request"
+        ],
+        "label": "Checkout request",
+        "via": "r-storefront-gateway"
+      },
+      {
+        "id": "f-gateway-order",
+        "source": "api-gateway",
+        "target": "order-service",
+        "data": [
+          "checkout-request"
+        ],
+        "label": "Checkout request",
+        "via": "r-gateway-order"
+      },
+      {
+        "id": "f-redis-cart",
+        "source": "redis",
+        "target": "cart-service",
+        "data": [
+          "cart-snapshot"
+        ],
+        "label": "Stored cart",
+        "via": "r-cart-redis"
+      },
+      {
+        "id": "f-cart-order",
+        "source": "cart-service",
+        "target": "order-service",
+        "data": [
+          "cart-snapshot"
+        ],
+        "label": "Cart snapshot",
+        "description": "Prices are refreshed from the catalog before the snapshot is returned.",
+        "via": "r-order-cart"
+      },
+      {
+        "id": "f-order-inventory",
+        "source": "order-service",
+        "target": "inventory-service",
+        "data": [
+          "reservation-request"
+        ],
+        "label": "Reservation requests",
+        "via": "r-order-inventory"
+      },
+      {
+        "id": "f-inventory-db",
+        "source": "inventory-service",
+        "target": "inventory-db",
+        "data": [
+          "reservations",
+          "stock-levels"
+        ],
+        "label": "Held stock",
+        "via": "r-inventory-inventorydb"
+      },
+      {
+        "id": "f-order-payment",
+        "source": "order-service",
+        "target": "payment-service",
+        "data": [
+          "payment-authorization"
+        ],
+        "label": "Authorization request",
+        "via": "r-order-payment"
+      },
+      {
+        "id": "f-payment-paystream",
+        "source": "payment-service",
+        "target": "paystream",
+        "data": [
+          "payment-authorization"
+        ],
+        "label": "Payment intent",
+        "via": "r-payment-paystream"
+      },
+      {
+        "id": "f-paystream-payment",
+        "source": "paystream",
+        "target": "payment-service",
+        "data": [
+          "payment-result"
+        ],
+        "label": "Authorization result",
+        "via": "r-payment-paystream"
+      },
+      {
+        "id": "f-payment-db",
+        "source": "payment-service",
+        "target": "payment-db",
+        "data": [
+          "payments"
+        ],
+        "label": "Payment record",
+        "via": "r-payment-paymentdb"
+      },
+      {
+        "id": "f-payment-order",
+        "source": "payment-service",
+        "target": "order-service",
+        "data": [
+          "payment-result"
+        ],
+        "label": "Payment result",
+        "via": "r-order-payment"
+      },
+      {
+        "id": "f-order-db",
+        "source": "order-service",
+        "target": "order-db",
+        "data": [
+          "orders",
+          "order-items",
+          "order-events"
+        ],
+        "label": "Order and outbox event",
+        "description": "Written in one transaction so the event is never lost.",
+        "via": "r-order-orderdb"
+      },
+      {
+        "id": "f-order-bus",
+        "source": "order-service",
+        "target": "event-bus",
+        "data": [
+          "order-confirmed"
+        ],
+        "label": "OrderConfirmed",
+        "via": "r-order-eventbus"
+      },
+      {
+        "id": "f-bus-notification",
+        "source": "event-bus",
+        "target": "notification-service",
+        "data": [
+          "order-confirmed"
+        ],
+        "label": "OrderConfirmed",
+        "via": "r-notification-eventbus"
+      },
+      {
+        "id": "f-notification-postbox",
+        "source": "notification-service",
+        "target": "postbox",
+        "data": [
+          "email-message"
+        ],
+        "label": "Confirmation email",
+        "via": "r-notification-postbox"
+      },
+      {
+        "id": "f-postbox-customer",
+        "source": "postbox",
+        "target": "customer",
+        "data": [
+          "email-message"
+        ],
+        "label": "Confirmation email"
+      }
+    ],
+    "behaviors": [
+      {
+        "kind": "interaction",
+        "id": "customer-login",
+        "name": "Customer signs in",
+        "summary": "From typing a password to a signed-in storefront.",
+        "description": "The gateway forwards the sign-in to the auth service, which checks the password hash, creates a session and caches it. Five failed attempts lock the account for 15 minutes.",
+        "participants": [
+          "customer",
+          "storefront",
+          "api-gateway",
+          "auth-service",
+          "identity-db",
+          "redis"
+        ],
+        "steps": [
+          {
+            "type": "message",
+            "id": "l1",
+            "kind": "call",
+            "from": "customer",
+            "to": "storefront",
+            "label": "Submit email and password",
+            "data": [
+              "credentials"
+            ]
+          },
+          {
+            "type": "message",
+            "id": "l2",
+            "kind": "call",
+            "from": "storefront",
+            "to": "api-gateway",
+            "label": "POST /auth/sessions",
+            "relationship": "r-storefront-gateway",
+            "data": [
+              "credentials"
+            ]
+          },
+          {
+            "type": "message",
+            "id": "l3",
+            "kind": "call",
+            "from": "api-gateway",
+            "to": "auth-service",
+            "label": "CreateSession(credentials)",
+            "relationship": "r-gateway-auth",
+            "data": [
+              "credentials"
+            ]
+          },
+          {
+            "type": "message",
+            "id": "l4",
+            "kind": "call",
+            "from": "auth-service",
+            "to": "identity-db",
+            "label": "Find user by email",
+            "relationship": "r-auth-identitydb",
+            "data": []
+          },
+          {
+            "type": "message",
+            "id": "l5",
+            "kind": "return",
+            "from": "identity-db",
+            "to": "auth-service",
+            "label": "User row",
+            "data": [
+              "users"
+            ]
+          },
+          {
+            "type": "message",
+            "id": "l6",
+            "kind": "self",
+            "from": "auth-service",
+            "to": "auth-service",
+            "label": "Verify password hash",
+            "description": "argon2id with a constant-time compare, so timing does not reveal whether the email exists.",
+            "data": []
+          },
+          {
+            "type": "fragment",
+            "id": "l-alt",
+            "kind": "alt",
+            "label": "Password check",
+            "branches": [
+              {
+                "guard": "password matches",
+                "steps": [
+                  {
+                    "type": "message",
+                    "id": "l7",
+                    "kind": "call",
+                    "from": "auth-service",
+                    "to": "identity-db",
+                    "label": "Insert session, reset failed attempts",
+                    "relationship": "r-auth-identitydb",
+                    "data": [
+                      "sessions"
+                    ]
+                  },
+                  {
+                    "type": "message",
+                    "id": "l8",
+                    "kind": "return",
+                    "from": "identity-db",
+                    "to": "auth-service",
+                    "label": "Session id",
+                    "data": []
+                  },
+                  {
+                    "type": "message",
+                    "id": "l9",
+                    "kind": "call",
+                    "from": "auth-service",
+                    "to": "redis",
+                    "label": "Cache session for 30 days",
+                    "relationship": "r-auth-redis",
+                    "data": [
+                      "session-token"
+                    ]
+                  },
+                  {
+                    "type": "message",
+                    "id": "l9r",
+                    "kind": "return",
+                    "from": "redis",
+                    "to": "auth-service",
+                    "label": "OK",
+                    "data": []
+                  },
+                  {
+                    "type": "message",
+                    "id": "l10",
+                    "kind": "return",
+                    "from": "auth-service",
+                    "to": "api-gateway",
+                    "label": "Session token",
+                    "data": [
+                      "session-token"
+                    ]
+                  },
+                  {
+                    "type": "message",
+                    "id": "l11",
+                    "kind": "return",
+                    "from": "api-gateway",
+                    "to": "storefront",
+                    "label": "201 Created + Set-Cookie",
+                    "data": []
+                  },
+                  {
+                    "type": "message",
+                    "id": "l12",
+                    "kind": "return",
+                    "from": "storefront",
+                    "to": "customer",
+                    "label": "Show their account",
+                    "data": []
+                  }
+                ]
+              },
+              {
+                "guard": "password does not match",
+                "steps": [
+                  {
+                    "type": "message",
+                    "id": "l13",
+                    "kind": "call",
+                    "from": "auth-service",
+                    "to": "identity-db",
+                    "label": "Increment failed attempts",
+                    "relationship": "r-auth-identitydb",
+                    "data": []
+                  },
+                  {
+                    "type": "message",
+                    "id": "l13r",
+                    "kind": "return",
+                    "from": "identity-db",
+                    "to": "auth-service",
+                    "label": "Attempt count",
+                    "data": []
+                  },
+                  {
+                    "type": "fragment",
+                    "id": "l-opt-lock",
+                    "kind": "opt",
+                    "label": "Lock out",
+                    "branches": [
+                      {
+                        "guard": "5 or more failed attempts",
+                        "steps": [
+                          {
+                            "type": "message",
+                            "id": "l14",
+                            "kind": "self",
+                            "from": "auth-service",
+                            "to": "auth-service",
+                            "label": "Lock account for 15 minutes",
+                            "data": []
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "message",
+                    "id": "l15",
+                    "kind": "return",
+                    "from": "auth-service",
+                    "to": "api-gateway",
+                    "label": "Unauthenticated",
+                    "data": []
+                  },
+                  {
+                    "type": "message",
+                    "id": "l16",
+                    "kind": "return",
+                    "from": "api-gateway",
+                    "to": "storefront",
+                    "label": "401 Unauthorized",
+                    "data": []
+                  },
+                  {
+                    "type": "message",
+                    "id": "l17",
+                    "kind": "return",
+                    "from": "storefront",
+                    "to": "customer",
+                    "label": "Show “Email or password is wrong”",
+                    "data": []
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "interaction",
+        "id": "checkout",
+        "name": "Customer checks out",
+        "summary": "From “Place order” to a confirmed, paid order and an email.",
+        "description": "The order service orchestrates checkout. Stock is reserved line by line before payment is requested. If payment is declined, reservations are released and the customer can try another payment method.",
+        "participants": [
+          "customer",
+          "storefront",
+          "api-gateway",
+          "order-service",
+          "cart-service",
+          "inventory-service",
+          "payment-service",
+          "paystream",
+          "event-bus",
+          "notification-service"
+        ],
+        "steps": [
+          {
+            "type": "message",
+            "id": "c1",
+            "kind": "call",
+            "from": "customer",
+            "to": "storefront",
+            "label": "Place order",
+            "data": [
+              "checkout-request"
+            ]
+          },
+          {
+            "type": "message",
+            "id": "c2",
+            "kind": "call",
+            "from": "storefront",
+            "to": "api-gateway",
+            "label": "POST /checkout",
+            "relationship": "r-storefront-gateway",
+            "data": [
+              "checkout-request"
+            ]
+          },
+          {
+            "type": "message",
+            "id": "c3",
+            "kind": "call",
+            "from": "api-gateway",
+            "to": "order-service",
+            "label": "StartCheckout",
+            "relationship": "r-gateway-order",
+            "data": [
+              "checkout-request"
+            ]
+          },
+          {
+            "type": "message",
+            "id": "c4",
+            "kind": "call",
+            "from": "order-service",
+            "to": "cart-service",
+            "label": "GetCart(cart_id)",
+            "relationship": "r-order-cart",
+            "data": []
+          },
+          {
+            "type": "message",
+            "id": "c5",
+            "kind": "return",
+            "from": "cart-service",
+            "to": "order-service",
+            "label": "Cart lines with prices",
+            "data": [
+              "cart-snapshot"
+            ]
+          },
+          {
+            "type": "message",
+            "id": "c6",
+            "kind": "self",
+            "from": "order-service",
+            "to": "order-service",
+            "label": "Validate cart, calculate totals",
+            "description": "Creates the order in state Created with prices frozen.",
+            "data": []
+          },
+          {
+            "type": "fragment",
+            "id": "c-loop",
+            "kind": "loop",
+            "label": "Reserve stock",
+            "branches": [
+              {
+                "guard": "for each line item",
+                "steps": [
+                  {
+                    "type": "message",
+                    "id": "c7",
+                    "kind": "call",
+                    "from": "order-service",
+                    "to": "inventory-service",
+                    "label": "Reserve(product, quantity)",
+                    "relationship": "r-order-inventory",
+                    "data": [
+                      "reservation-request"
+                    ]
+                  },
+                  {
+                    "type": "message",
+                    "id": "c8",
+                    "kind": "return",
+                    "from": "inventory-service",
+                    "to": "order-service",
+                    "label": "Reservation held",
+                    "data": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "message",
+            "id": "c9",
+            "kind": "call",
+            "from": "order-service",
+            "to": "payment-service",
+            "label": "Authorize(total, method)",
+            "relationship": "r-order-payment",
+            "data": [
+              "payment-authorization"
+            ]
+          },
+          {
+            "type": "message",
+            "id": "c10",
+            "kind": "call",
+            "from": "payment-service",
+            "to": "paystream",
+            "label": "POST /v1/payment_intents",
+            "relationship": "r-payment-paystream",
+            "data": [
+              "payment-authorization"
+            ]
+          },
+          {
+            "type": "message",
+            "id": "c11",
+            "kind": "return",
+            "from": "paystream",
+            "to": "payment-service",
+            "label": "Authorization result",
+            "data": [
+              "payment-result"
+            ]
+          },
+          {
+            "type": "fragment",
+            "id": "c-alt",
+            "kind": "alt",
+            "label": "Payment outcome",
+            "branches": [
+              {
+                "guard": "authorized",
+                "steps": [
+                  {
+                    "type": "message",
+                    "id": "c12",
+                    "kind": "return",
+                    "from": "payment-service",
+                    "to": "order-service",
+                    "label": "Authorized",
+                    "data": [
+                      "payment-result"
+                    ]
+                  },
+                  {
+                    "type": "message",
+                    "id": "c13",
+                    "kind": "self",
+                    "from": "order-service",
+                    "to": "order-service",
+                    "label": "Mark paid, write OrderConfirmed to outbox",
+                    "data": []
+                  },
+                  {
+                    "type": "fragment",
+                    "id": "c-par",
+                    "kind": "par",
+                    "label": "Respond and notify",
+                    "branches": [
+                      {
+                        "guard": "answer the customer",
+                        "steps": [
+                          {
+                            "type": "message",
+                            "id": "c14",
+                            "kind": "return",
+                            "from": "order-service",
+                            "to": "api-gateway",
+                            "label": "Order K-48213 confirmed",
+                            "data": []
+                          },
+                          {
+                            "type": "message",
+                            "id": "c15",
+                            "kind": "return",
+                            "from": "api-gateway",
+                            "to": "storefront",
+                            "label": "201 Created",
+                            "data": []
+                          },
+                          {
+                            "type": "message",
+                            "id": "c16",
+                            "kind": "return",
+                            "from": "storefront",
+                            "to": "customer",
+                            "label": "Show confirmation page",
+                            "data": []
+                          }
+                        ]
+                      },
+                      {
+                        "guard": "send the email",
+                        "steps": [
+                          {
+                            "type": "message",
+                            "id": "c17",
+                            "kind": "async",
+                            "from": "order-service",
+                            "to": "event-bus",
+                            "label": "Publish OrderConfirmed",
+                            "relationship": "r-order-eventbus",
+                            "data": [
+                              "order-confirmed"
+                            ]
+                          },
+                          {
+                            "type": "message",
+                            "id": "c18",
+                            "kind": "async",
+                            "from": "event-bus",
+                            "to": "notification-service",
+                            "label": "Deliver OrderConfirmed",
+                            "relationship": "r-notification-eventbus",
+                            "data": [
+                              "order-confirmed"
+                            ]
+                          },
+                          {
+                            "type": "message",
+                            "id": "c19",
+                            "kind": "self",
+                            "from": "notification-service",
+                            "to": "notification-service",
+                            "label": "Render and send email",
+                            "description": "Sends through Postbox with the order-confirmation template.",
+                            "data": []
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "guard": "declined",
+                "steps": [
+                  {
+                    "type": "message",
+                    "id": "c20",
+                    "kind": "return",
+                    "from": "payment-service",
+                    "to": "order-service",
+                    "label": "Declined (insufficient funds)",
+                    "data": [
+                      "payment-result"
+                    ]
+                  },
+                  {
+                    "type": "message",
+                    "id": "c21",
+                    "kind": "self",
+                    "from": "order-service",
+                    "to": "order-service",
+                    "label": "Mark payment failed, keep stock 30 min",
+                    "description": "The order moves to Payment failed. Its reservations stay held until the retry window closes.",
+                    "data": []
+                  },
+                  {
+                    "type": "message",
+                    "id": "c22",
+                    "kind": "return",
+                    "from": "order-service",
+                    "to": "api-gateway",
+                    "label": "Declined, 2 tries left",
+                    "data": []
+                  },
+                  {
+                    "type": "message",
+                    "id": "c23",
+                    "kind": "return",
+                    "from": "api-gateway",
+                    "to": "storefront",
+                    "label": "402 Payment Required",
+                    "data": []
+                  },
+                  {
+                    "type": "message",
+                    "id": "c24",
+                    "kind": "return",
+                    "from": "storefront",
+                    "to": "customer",
+                    "label": "Ask for another card",
+                    "data": []
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "interaction",
+        "id": "payment-retry",
+        "name": "Customer retries a declined payment",
+        "summary": "A second card, inside the 30-minute window, on the same order.",
+        "participants": [
+          "customer",
+          "storefront",
+          "api-gateway",
+          "order-service",
+          "payment-service",
+          "paystream"
+        ],
+        "steps": [
+          {
+            "type": "message",
+            "id": "r1",
+            "kind": "call",
+            "from": "customer",
+            "to": "storefront",
+            "label": "Pay with another card",
+            "data": [
+              "checkout-request"
+            ]
+          },
+          {
+            "type": "message",
+            "id": "r2",
+            "kind": "call",
+            "from": "storefront",
+            "to": "api-gateway",
+            "label": "POST /orders/K-48213/payment",
+            "relationship": "r-storefront-gateway",
+            "data": []
+          },
+          {
+            "type": "message",
+            "id": "r3",
+            "kind": "call",
+            "from": "api-gateway",
+            "to": "order-service",
+            "label": "RetryPayment(order, method)",
+            "relationship": "r-gateway-order",
+            "data": []
+          },
+          {
+            "type": "message",
+            "id": "r4",
+            "kind": "self",
+            "from": "order-service",
+            "to": "order-service",
+            "label": "Check the window: try 2 of 3",
+            "data": []
+          },
+          {
+            "type": "fragment",
+            "id": "r-alt",
+            "kind": "alt",
+            "label": "Retry window",
+            "branches": [
+              {
+                "guard": "window open",
+                "steps": [
+                  {
+                    "type": "message",
+                    "id": "r5",
+                    "kind": "call",
+                    "from": "order-service",
+                    "to": "payment-service",
+                    "label": "Authorize(total, new card)",
+                    "relationship": "r-order-payment",
+                    "data": [
+                      "payment-authorization"
+                    ]
+                  },
+                  {
+                    "type": "message",
+                    "id": "r6",
+                    "kind": "call",
+                    "from": "payment-service",
+                    "to": "paystream",
+                    "label": "POST /v1/payment_intents",
+                    "relationship": "r-payment-paystream",
+                    "data": []
+                  },
+                  {
+                    "type": "message",
+                    "id": "r7",
+                    "kind": "return",
+                    "from": "paystream",
+                    "to": "payment-service",
+                    "label": "Authorized",
+                    "data": [
+                      "payment-result"
+                    ]
+                  },
+                  {
+                    "type": "message",
+                    "id": "r8",
+                    "kind": "return",
+                    "from": "payment-service",
+                    "to": "order-service",
+                    "label": "Authorized",
+                    "data": []
+                  },
+                  {
+                    "type": "message",
+                    "id": "r9",
+                    "kind": "self",
+                    "from": "order-service",
+                    "to": "order-service",
+                    "label": "Mark paid, commit held stock",
+                    "data": []
+                  },
+                  {
+                    "type": "message",
+                    "id": "r10",
+                    "kind": "return",
+                    "from": "order-service",
+                    "to": "api-gateway",
+                    "label": "Order confirmed",
+                    "data": []
+                  },
+                  {
+                    "type": "message",
+                    "id": "r11",
+                    "kind": "return",
+                    "from": "api-gateway",
+                    "to": "storefront",
+                    "label": "200 OK",
+                    "data": []
+                  },
+                  {
+                    "type": "message",
+                    "id": "r12",
+                    "kind": "return",
+                    "from": "storefront",
+                    "to": "customer",
+                    "label": "Show confirmation",
+                    "data": []
+                  }
+                ]
+              },
+              {
+                "guard": "window closed",
+                "steps": [
+                  {
+                    "type": "message",
+                    "id": "r13",
+                    "kind": "return",
+                    "from": "order-service",
+                    "to": "api-gateway",
+                    "label": "Retry window closed",
+                    "data": []
+                  },
+                  {
+                    "type": "message",
+                    "id": "r14",
+                    "kind": "return",
+                    "from": "api-gateway",
+                    "to": "storefront",
+                    "label": "410 Gone",
+                    "data": []
+                  },
+                  {
+                    "type": "message",
+                    "id": "r15",
+                    "kind": "return",
+                    "from": "storefront",
+                    "to": "customer",
+                    "label": "Explain the order was cancelled",
+                    "data": []
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "activity",
+        "id": "checkout-process",
+        "name": "Checkout, step by step",
+        "summary": "Who does what during checkout, including retries and failures.",
+        "nodes": [
+          {
+            "id": "a-start",
+            "kind": "initial",
+            "label": "Customer opens checkout",
+            "performedBy": "customer"
+          },
+          {
+            "id": "a-review",
+            "kind": "action",
+            "label": "Review cart and address",
+            "performedBy": "customer"
+          },
+          {
+            "id": "a-place",
+            "kind": "action",
+            "label": "Place order",
+            "performedBy": "customer"
+          },
+          {
+            "id": "a-validate",
+            "kind": "action",
+            "label": "Validate cart",
+            "description": "Checks that every product is live and prices have not changed since the cart was read.",
+            "performedBy": "order-service"
+          },
+          {
+            "id": "a-valid",
+            "kind": "decision",
+            "label": "Cart valid?",
+            "performedBy": "order-service"
+          },
+          {
+            "id": "a-fix",
+            "kind": "action",
+            "label": "Fix cart issues",
+            "description": "The storefront shows which lines changed or sold out.",
+            "performedBy": "customer"
+          },
+          {
+            "id": "a-fork",
+            "kind": "fork",
+            "label": "In parallel",
+            "performedBy": "order-service"
+          },
+          {
+            "id": "a-reserve",
+            "kind": "action",
+            "label": "Reserve stock",
+            "description": "Holds each line for 15 minutes.",
+            "performedBy": "inventory-service"
+          },
+          {
+            "id": "a-totals",
+            "kind": "action",
+            "label": "Calculate tax and shipping",
+            "performedBy": "order-service"
+          },
+          {
+            "id": "a-join",
+            "kind": "join",
+            "label": "Both done",
+            "performedBy": "order-service"
+          },
+          {
+            "id": "a-authorize",
+            "kind": "action",
+            "label": "Authorize payment",
+            "description": "Calls Paystream with an idempotency key, so retries never charge twice.",
+            "performedBy": "payment-service"
+          },
+          {
+            "id": "a-authorized",
+            "kind": "decision",
+            "label": "Authorized?",
+            "performedBy": "payment-service"
+          },
+          {
+            "id": "a-confirm",
+            "kind": "action",
+            "label": "Confirm order",
+            "performedBy": "order-service"
+          },
+          {
+            "id": "a-email",
+            "kind": "action",
+            "label": "Send confirmation email",
+            "description": "Through the event bus and the notification service.",
+            "performedBy": "order-service"
+          },
+          {
+            "id": "a-done",
+            "kind": "final",
+            "label": "Order placed",
+            "performedBy": "order-service",
+            "outcome": "success"
+          },
+          {
+            "id": "a-attempts",
+            "kind": "decision",
+            "label": "Attempts left?",
+            "description": "A customer gets three payment attempts per order.",
+            "performedBy": "order-service"
+          },
+          {
+            "id": "a-method",
+            "kind": "action",
+            "label": "Choose another payment method",
+            "performedBy": "customer"
+          },
+          {
+            "id": "a-release",
+            "kind": "action",
+            "label": "Release reservations",
+            "performedBy": "inventory-service"
+          },
+          {
+            "id": "a-failed",
+            "kind": "final",
+            "label": "Checkout failed",
+            "performedBy": "inventory-service",
+            "outcome": "failure"
+          }
+        ],
+        "flows": [
+          {
+            "id": "af1",
+            "from": "a-start",
+            "to": "a-review"
+          },
+          {
+            "id": "af2",
+            "from": "a-review",
+            "to": "a-place"
+          },
+          {
+            "id": "af3",
+            "from": "a-place",
+            "to": "a-validate"
+          },
+          {
+            "id": "af4",
+            "from": "a-validate",
+            "to": "a-valid"
+          },
+          {
+            "id": "af5",
+            "from": "a-valid",
+            "to": "a-fork",
+            "guard": "Yes"
+          },
+          {
+            "id": "af6",
+            "from": "a-valid",
+            "to": "a-fix",
+            "guard": "No"
+          },
+          {
+            "id": "af7",
+            "from": "a-fix",
+            "to": "a-review"
+          },
+          {
+            "id": "af8",
+            "from": "a-fork",
+            "to": "a-reserve"
+          },
+          {
+            "id": "af9",
+            "from": "a-fork",
+            "to": "a-totals"
+          },
+          {
+            "id": "af10",
+            "from": "a-reserve",
+            "to": "a-join"
+          },
+          {
+            "id": "af11",
+            "from": "a-totals",
+            "to": "a-join"
+          },
+          {
+            "id": "af12",
+            "from": "a-join",
+            "to": "a-authorize"
+          },
+          {
+            "id": "af13",
+            "from": "a-authorize",
+            "to": "a-authorized"
+          },
+          {
+            "id": "af14",
+            "from": "a-authorized",
+            "to": "a-confirm",
+            "guard": "Yes"
+          },
+          {
+            "id": "af15",
+            "from": "a-authorized",
+            "to": "a-attempts",
+            "guard": "No"
+          },
+          {
+            "id": "af16",
+            "from": "a-confirm",
+            "to": "a-email"
+          },
+          {
+            "id": "af17",
+            "from": "a-email",
+            "to": "a-done"
+          },
+          {
+            "id": "af18",
+            "from": "a-attempts",
+            "to": "a-method",
+            "guard": "Yes"
+          },
+          {
+            "id": "af19",
+            "from": "a-method",
+            "to": "a-authorize"
+          },
+          {
+            "id": "af20",
+            "from": "a-attempts",
+            "to": "a-release",
+            "guard": "No"
+          },
+          {
+            "id": "af21",
+            "from": "a-release",
+            "to": "a-failed"
+          }
+        ]
+      },
+      {
+        "kind": "state-machine",
+        "id": "order-lifecycle",
+        "name": "Order lifecycle",
+        "summary": "Every status an order can have, and what moves it on.",
+        "description": "Stored in orders.status. Only the order domain module changes it, and every change writes an event to the outbox.",
+        "subject": "orders",
+        "owner": "order-service",
+        "states": [
+          {
+            "id": "s-initial",
+            "kind": "initial",
+            "name": "Start",
+            "entryActions": [],
+            "outcome": "neutral"
+          },
+          {
+            "id": "s-created",
+            "kind": "state",
+            "name": "Created",
+            "description": "Cart validated and prices frozen. Stock is being reserved.",
+            "entryActions": [
+              "Snapshot cart lines",
+              "Calculate totals"
+            ],
+            "outcome": "neutral"
+          },
+          {
+            "id": "s-awaiting",
+            "kind": "state",
+            "name": "Awaiting payment",
+            "description": "Stock is held. Waiting for the payment provider.",
+            "entryActions": [
+              "Request authorization"
+            ],
+            "outcome": "neutral"
+          },
+          {
+            "id": "s-failed",
+            "kind": "state",
+            "name": "Payment failed",
+            "description": "The last attempt was declined. The customer may retry.",
+            "entryActions": [
+              "Record decline reason"
+            ],
+            "outcome": "failure"
+          },
+          {
+            "id": "s-paid",
+            "kind": "state",
+            "name": "Paid",
+            "description": "Payment authorized. The customer has been told.",
+            "entryActions": [
+              "Publish OrderConfirmed"
+            ],
+            "outcome": "success"
+          },
+          {
+            "id": "s-processing",
+            "kind": "state",
+            "name": "Processing",
+            "description": "The warehouse is picking and packing.",
+            "entryActions": [],
+            "outcome": "neutral"
+          },
+          {
+            "id": "s-shipped",
+            "kind": "state",
+            "name": "Shipped",
+            "description": "With the carrier.",
+            "entryActions": [
+              "Capture payment",
+              "Send shipping email"
+            ],
+            "outcome": "neutral"
+          },
+          {
+            "id": "s-delivered",
+            "kind": "final",
+            "name": "Delivered",
+            "description": "The carrier confirmed delivery.",
+            "entryActions": [],
+            "outcome": "success"
+          },
+          {
+            "id": "s-cancelled",
+            "kind": "final",
+            "name": "Cancelled",
+            "description": "Stopped before shipping. Stock released and any payment voided or refunded.",
+            "entryActions": [
+              "Release reservations"
+            ],
+            "outcome": "failure"
+          }
+        ],
+        "transitions": [
+          {
+            "id": "t-start",
+            "from": "s-initial",
+            "to": "s-created",
+            "event": "Checkout started",
+            "actions": [
+              "Freeze prices"
+            ],
+            "triggeredBy": "order-service"
+          },
+          {
+            "id": "t-reserved",
+            "from": "s-created",
+            "to": "s-awaiting",
+            "event": "Stock reserved",
+            "guard": "every line reserved",
+            "actions": [
+              "Ask payment service to authorize"
+            ],
+            "triggeredBy": "inventory-service"
+          },
+          {
+            "id": "t-out-of-stock",
+            "from": "s-created",
+            "to": "s-cancelled",
+            "event": "Reservation failed",
+            "guard": "a line is out of stock",
+            "actions": [
+              "Release partial reservations",
+              "Tell the customer which items sold out"
+            ],
+            "triggeredBy": "inventory-service"
+          },
+          {
+            "id": "t-authorized",
+            "from": "s-awaiting",
+            "to": "s-paid",
+            "event": "Payment authorized",
+            "actions": [
+              "Write OrderConfirmed to outbox",
+              "Commit reservations"
+            ],
+            "description": "The happy path. Fulfilment and email both react to the OrderConfirmed event.",
+            "triggeredBy": "payment-service"
+          },
+          {
+            "id": "t-declined",
+            "from": "s-awaiting",
+            "to": "s-failed",
+            "event": "Payment declined",
+            "actions": [
+              "Increment payment attempts"
+            ],
+            "triggeredBy": "payment-service"
+          },
+          {
+            "id": "t-retry",
+            "from": "s-failed",
+            "to": "s-awaiting",
+            "event": "Customer retries",
+            "guard": "fewer than 3 attempts",
+            "actions": [
+              "Request authorization with new method"
+            ],
+            "triggeredBy": "storefront"
+          },
+          {
+            "id": "t-give-up",
+            "from": "s-failed",
+            "to": "s-cancelled",
+            "event": "Retry window closed",
+            "guard": "3 attempts or 30 minutes",
+            "actions": [
+              "Release reservations",
+              "Send cancellation email"
+            ],
+            "triggeredBy": "order-service"
+          },
+          {
+            "id": "t-cancel",
+            "from": "s-paid",
+            "to": "s-cancelled",
+            "event": "Customer cancels",
+            "guard": "not yet picked",
+            "actions": [
+              "Void authorization",
+              "Release reservations"
+            ],
+            "triggeredBy": "storefront"
+          },
+          {
+            "id": "t-pick",
+            "from": "s-paid",
+            "to": "s-processing",
+            "event": "Picking started",
+            "actions": [],
+            "triggeredBy": "back-office"
+          },
+          {
+            "id": "t-ship",
+            "from": "s-processing",
+            "to": "s-shipped",
+            "event": "Label printed",
+            "actions": [
+              "Capture payment",
+              "Send shipping email"
+            ],
+            "triggeredBy": "back-office"
+          },
+          {
+            "id": "t-deliver",
+            "from": "s-shipped",
+            "to": "s-delivered",
+            "event": "Carrier confirms delivery",
+            "actions": [
+              "Send delivery email"
+            ]
+          }
+        ]
+      }
+    ],
+    "useCases": [
+      {
+        "id": "cap-browse",
+        "name": "Browse and search products",
+        "summary": "Find products by category or search.",
+        "area": "Shopping",
+        "actors": [
+          "customer"
+        ],
+        "supporting": [],
+        "realizedBy": [
+          "storefront",
+          "catalog-service"
+        ],
+        "behaviors": [],
+        "includes": [],
+        "ext": {}
+      },
+      {
+        "id": "cap-cart",
+        "name": "Keep a cart",
+        "summary": "Add, change and remove items. The cart survives for 30 days.",
+        "area": "Shopping",
+        "actors": [
+          "customer"
+        ],
+        "supporting": [],
+        "realizedBy": [
+          "storefront",
+          "cart-service"
+        ],
+        "behaviors": [],
+        "includes": [],
+        "ext": {}
+      },
+      {
+        "id": "cap-signup",
+        "name": "Create an account",
+        "summary": "Register with an email and password.",
+        "area": "Account",
+        "actors": [
+          "customer"
+        ],
+        "supporting": [],
+        "realizedBy": [
+          "auth-service"
+        ],
+        "behaviors": [],
+        "includes": [],
+        "ext": {}
+      },
+      {
+        "id": "cap-login",
+        "name": "Sign in",
+        "summary": "Start a session that lasts 30 days.",
+        "area": "Account",
+        "actors": [
+          "customer"
+        ],
+        "supporting": [],
+        "realizedBy": [
+          "auth-service",
+          "api-gateway"
+        ],
+        "behaviors": [
+          "customer-login"
+        ],
+        "includes": [],
+        "ext": {}
+      },
+      {
+        "id": "cap-checkout",
+        "name": "Check out",
+        "summary": "Turn the cart into a paid order.",
+        "area": "Orders",
+        "actors": [
+          "customer"
+        ],
+        "supporting": [
+          "paystream"
+        ],
+        "realizedBy": [
+          "order-service",
+          "inventory-service",
+          "payment-service"
+        ],
+        "behaviors": [
+          "checkout",
+          "checkout-process",
+          "order-lifecycle"
+        ],
+        "includes": [
+          "cap-pay"
+        ],
+        "ext": {}
+      },
+      {
+        "id": "cap-pay",
+        "name": "Pay by card",
+        "summary": "Authorize the order total. Up to three attempts.",
+        "area": "Orders",
+        "actors": [
+          "customer"
+        ],
+        "supporting": [
+          "paystream"
+        ],
+        "realizedBy": [
+          "payment-service"
+        ],
+        "behaviors": [
+          "checkout"
+        ],
+        "includes": [],
+        "ext": {}
+      },
+      {
+        "id": "cap-track",
+        "name": "Track an order",
+        "summary": "See where an order is, from paid to delivered.",
+        "area": "Orders",
+        "actors": [
+          "customer"
+        ],
+        "supporting": [],
+        "realizedBy": [
+          "order-service"
+        ],
+        "behaviors": [
+          "order-lifecycle"
+        ],
+        "includes": [],
+        "ext": {}
+      },
+      {
+        "id": "cap-cancel",
+        "name": "Cancel an order",
+        "summary": "Possible until picking starts.",
+        "area": "Orders",
+        "actors": [
+          "customer"
+        ],
+        "supporting": [
+          "paystream"
+        ],
+        "realizedBy": [
+          "order-service",
+          "payment-service"
+        ],
+        "behaviors": [
+          "order-lifecycle"
+        ],
+        "includes": [],
+        "ext": {}
+      },
+      {
+        "id": "cap-emails",
+        "name": "Get order emails",
+        "summary": "Confirmation, shipping and delivery emails.",
+        "area": "Orders",
+        "actors": [
+          "customer"
+        ],
+        "supporting": [
+          "postbox"
+        ],
+        "realizedBy": [
+          "notification-service"
+        ],
+        "behaviors": [
+          "checkout"
+        ],
+        "includes": [],
+        "ext": {}
+      },
+      {
+        "id": "cap-products",
+        "name": "Manage products and prices",
+        "summary": "Create, edit and retire products.",
+        "area": "Operations",
+        "actors": [
+          "store-operator"
+        ],
+        "supporting": [],
+        "realizedBy": [
+          "back-office",
+          "catalog-service"
+        ],
+        "behaviors": [],
+        "includes": [],
+        "ext": {}
+      },
+      {
+        "id": "cap-stock",
+        "name": "Adjust stock",
+        "summary": "Record deliveries, counts and damaged goods.",
+        "area": "Operations",
+        "actors": [
+          "store-operator"
+        ],
+        "supporting": [],
+        "realizedBy": [
+          "back-office",
+          "inventory-service"
+        ],
+        "behaviors": [],
+        "includes": [],
+        "ext": {}
+      },
+      {
+        "id": "cap-fulfil",
+        "name": "Fulfil orders",
+        "summary": "Pick, pack and ship paid orders.",
+        "area": "Operations",
+        "actors": [
+          "store-operator"
+        ],
+        "supporting": [],
+        "realizedBy": [
+          "back-office",
+          "order-service"
+        ],
+        "behaviors": [
+          "order-lifecycle"
+        ],
+        "includes": [],
+        "ext": {}
+      },
+      {
+        "id": "cap-refund",
+        "name": "Refund an order",
+        "summary": "Return money for a delivered or cancelled order.",
+        "area": "Operations",
+        "actors": [
+          "store-operator"
+        ],
+        "supporting": [
+          "paystream"
+        ],
+        "realizedBy": [
+          "back-office",
+          "payment-service"
+        ],
+        "behaviors": [],
+        "includes": [],
+        "ext": {}
+      }
+    ]
+  },
+  "views": [
+    {
+      "id": "system-context",
+      "title": "System context",
+      "description": "Kestrel Commerce as one box: who uses it, and which outside services it depends on.",
+      "category": "overview",
+      "positions": {},
+      "ext": {},
+      "type": "architecture",
+      "entities": [
+        "customer",
+        "store-operator",
+        "kestrel",
+        "storefront",
+        "back-office",
+        "api-gateway",
+        "auth-service",
+        "catalog-service",
+        "cart-service",
+        "order-service",
+        "payment-service",
+        "inventory-service",
+        "notification-service",
+        "retry-worker",
+        "identity-db",
+        "catalog-db",
+        "order-db",
+        "payment-db",
+        "inventory-db",
+        "redis",
+        "event-bus",
+        "paystream",
+        "postbox"
+      ],
+      "groups": [
+        {
+          "id": "zone-apps",
+          "label": "Apps and edge",
+          "description": "What people use, and the single door into the platform.",
+          "members": [
+            "storefront",
+            "back-office",
+            "api-gateway"
+          ]
+        },
+        {
+          "id": "zone-services",
+          "label": "Services",
+          "description": "Each service owns one part of the business and its data.",
+          "members": [
+            "auth-service",
+            "catalog-service",
+            "cart-service",
+            "order-service",
+            "payment-service",
+            "inventory-service",
+            "notification-service",
+            "retry-worker"
+          ]
+        },
+        {
+          "id": "zone-data",
+          "label": "Data and messaging",
+          "description": "One database per service, plus shared cache and event bus.",
+          "members": [
+            "identity-db",
+            "catalog-db",
+            "order-db",
+            "payment-db",
+            "inventory-db",
+            "redis",
+            "event-bus"
+          ]
+        }
+      ],
+      "collapsed": [
+        "kestrel"
+      ],
+      "layout": {
+        "direction": "down"
+      }
+    },
+    {
+      "id": "architecture",
+      "title": "Architecture",
+      "description": "The apps, services and stores inside Kestrel, and how they connect.",
+      "category": "overview",
+      "positions": {},
+      "ext": {},
+      "type": "architecture",
+      "entities": [
+        "customer",
+        "store-operator",
+        "kestrel",
+        "storefront",
+        "back-office",
+        "api-gateway",
+        "auth-service",
+        "catalog-service",
+        "cart-service",
+        "order-service",
+        "payment-service",
+        "inventory-service",
+        "notification-service",
+        "retry-worker",
+        "identity-db",
+        "catalog-db",
+        "order-db",
+        "payment-db",
+        "inventory-db",
+        "redis",
+        "event-bus",
+        "paystream",
+        "postbox"
+      ],
+      "groups": [
+        {
+          "id": "zone-apps",
+          "label": "Apps and edge",
+          "description": "What people use, and the single door into the platform.",
+          "members": [
+            "storefront",
+            "back-office",
+            "api-gateway"
+          ]
+        },
+        {
+          "id": "zone-services",
+          "label": "Services",
+          "description": "Each service owns one part of the business and its data.",
+          "members": [
+            "auth-service",
+            "catalog-service",
+            "cart-service",
+            "order-service",
+            "payment-service",
+            "inventory-service",
+            "notification-service",
+            "retry-worker"
+          ]
+        },
+        {
+          "id": "zone-data",
+          "label": "Data and messaging",
+          "description": "One database per service, plus shared cache and event bus.",
+          "members": [
+            "identity-db",
+            "catalog-db",
+            "order-db",
+            "payment-db",
+            "inventory-db",
+            "redis",
+            "event-bus"
+          ]
+        }
+      ],
+      "collapsed": [],
+      "layout": {
+        "direction": "down"
+      }
+    },
+    {
+      "id": "login-sequence",
+      "title": "Sign-in sequence",
+      "description": "The calls made when a customer signs in, including a wrong password and lock-out.",
+      "category": "behavior",
+      "positions": {},
+      "ext": {},
+      "type": "sequence",
+      "interaction": "customer-login"
+    },
+    {
+      "id": "checkout-sequence",
+      "title": "Checkout sequence",
+      "description": "Every call made from “Place order” to the confirmation email.",
+      "category": "behavior",
+      "positions": {},
+      "ext": {},
+      "type": "sequence",
+      "interaction": "checkout"
+    },
+    {
+      "id": "retry-sequence",
+      "title": "Payment retry sequence",
+      "description": "A customer pays with another card after a decline, inside the retry window.",
+      "category": "behavior",
+      "positions": {},
+      "ext": {},
+      "type": "sequence",
+      "interaction": "payment-retry"
+    },
+    {
+      "id": "system-map",
+      "title": "Kestrel at a glance",
+      "description": "The services a customer order passes through. Open the order service to see its modules.",
+      "category": "overview",
+      "positions": {},
+      "ext": {},
+      "type": "map",
+      "entities": [
+        "customer",
+        "storefront",
+        "api-gateway",
+        "order-service",
+        "order-api",
+        "checkout-orchestrator",
+        "order-domain",
+        "pricing",
+        "order-repository",
+        "payment-client",
+        "inventory-client",
+        "postgres-repository",
+        "event-publisher",
+        "cart-service",
+        "payment-service",
+        "inventory-service",
+        "notification-service",
+        "order-db",
+        "event-bus",
+        "paystream"
+      ],
+      "passThrough": [
+        "api-gateway"
+      ],
+      "collapsed": [
+        "order-service"
+      ],
+      "layout": {
+        "direction": "right"
+      }
+    },
+    {
+      "id": "retry-map",
+      "title": "Payment retry map",
+      "description": "The parts of Kestrel that a declined payment touches, and the new retry window worker.",
+      "category": "overview",
+      "positions": {},
+      "ext": {},
+      "type": "map",
+      "entities": [
+        "customer",
+        "storefront",
+        "api-gateway",
+        "order-service",
+        "payment-service",
+        "paystream",
+        "order-db",
+        "retry-worker",
+        "inventory-service",
+        "event-bus"
+      ],
+      "relationships": [
+        "r-customer-storefront",
+        "r-storefront-gateway",
+        "r-gateway-order",
+        "r-order-payment",
+        "r-payment-paystream",
+        "r-order-orderdb",
+        "r-order-inventory",
+        "r-retry-orderdb",
+        "r-retry-inventory",
+        "r-retry-eventbus"
+      ],
+      "passThrough": [
+        "api-gateway"
+      ],
+      "collapsed": [],
+      "layout": {
+        "direction": "right"
+      }
+    },
+    {
+      "id": "checkout-activity",
+      "title": "Checkout activity",
+      "description": "Checkout as a flowchart, with one lane per participant, decisions and retries.",
+      "category": "behavior",
+      "positions": {},
+      "ext": {},
+      "type": "activity",
+      "activity": "checkout-process",
+      "swimlanes": true
+    },
+    {
+      "id": "order-lifecycle",
+      "title": "Order lifecycle",
+      "description": "The statuses an order moves through and the events that move it.",
+      "category": "behavior",
+      "positions": {},
+      "ext": {},
+      "type": "state",
+      "stateMachine": "order-lifecycle"
+    },
+    {
+      "id": "checkout-dataflow",
+      "title": "Checkout data flow",
+      "description": "What data moves where when a customer places an order.",
+      "category": "data",
+      "positions": {},
+      "ext": {},
+      "type": "dataflow",
+      "flows": [
+        "f-customer-storefront",
+        "f-storefront-gateway",
+        "f-gateway-order",
+        "f-redis-cart",
+        "f-cart-order",
+        "f-order-inventory",
+        "f-inventory-db",
+        "f-order-payment",
+        "f-payment-paystream",
+        "f-paystream-payment",
+        "f-payment-db",
+        "f-payment-order",
+        "f-order-db",
+        "f-order-bus",
+        "f-bus-notification",
+        "f-notification-postbox",
+        "f-postbox-customer"
+      ],
+      "showControlFlow": true
+    },
+    {
+      "id": "data-model",
+      "title": "Data model",
+      "description": "The tables behind accounts, products, orders, payments and stock, grouped by database.",
+      "category": "data",
+      "positions": {},
+      "ext": {},
+      "type": "erd",
+      "dataTypes": [
+        "users",
+        "sessions",
+        "categories",
+        "products",
+        "orders",
+        "order-items",
+        "order-events",
+        "payments",
+        "stock-levels",
+        "reservations"
+      ],
+      "groupByStore": true,
+      "fieldLimit": 6
+    },
+    {
+      "id": "order-service-components",
+      "title": "Order service components",
+      "description": "The modules inside the order service. Adapters implement the domain’s interfaces, so dependencies point inward.",
+      "category": "structure",
+      "positions": {},
+      "ext": {},
+      "type": "dependency",
+      "entities": [
+        "order-api",
+        "checkout-orchestrator",
+        "event-publisher",
+        "order-domain",
+        "pricing",
+        "payment-port",
+        "inventory-port",
+        "order-repository",
+        "payment-client",
+        "inventory-client",
+        "postgres-repository",
+        "lib-money",
+        "lib-telemetry"
+      ],
+      "layers": [
+        {
+          "id": "layer-delivery",
+          "label": "Delivery",
+          "description": "How requests arrive.",
+          "members": [
+            "order-api"
+          ]
+        },
+        {
+          "id": "layer-application",
+          "label": "Application",
+          "description": "Use cases that coordinate the domain.",
+          "members": [
+            "checkout-orchestrator",
+            "event-publisher"
+          ]
+        },
+        {
+          "id": "layer-domain",
+          "label": "Domain",
+          "description": "Business rules and the interfaces they need.",
+          "members": [
+            "order-domain",
+            "pricing",
+            "payment-port",
+            "inventory-port",
+            "order-repository"
+          ]
+        },
+        {
+          "id": "layer-adapters",
+          "label": "Adapters",
+          "description": "Talk to other services and the database.",
+          "members": [
+            "payment-client",
+            "inventory-client",
+            "postgres-repository"
+          ]
+        },
+        {
+          "id": "layer-libraries",
+          "label": "Shared libraries",
+          "description": "Used across Kestrel services.",
+          "members": [
+            "lib-money",
+            "lib-telemetry"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "service-dependencies",
+      "title": "Service dependencies",
+      "description": "Which service needs which at runtime. Solid lines wait for an answer; dashed lines are events.",
+      "category": "structure",
+      "positions": {},
+      "ext": {},
+      "type": "dependency",
+      "entities": [
+        "storefront",
+        "back-office",
+        "api-gateway",
+        "order-service",
+        "auth-service",
+        "catalog-service",
+        "cart-service",
+        "payment-service",
+        "inventory-service",
+        "notification-service",
+        "redis",
+        "event-bus",
+        "paystream",
+        "postbox"
+      ],
+      "relationships": [
+        "r-storefront-gateway",
+        "r-backoffice-gateway",
+        "r-gateway-auth",
+        "r-gateway-catalog",
+        "r-gateway-cart",
+        "r-gateway-order",
+        "r-auth-redis",
+        "r-catalog-redis",
+        "r-cart-redis",
+        "r-cart-catalog",
+        "r-order-cart",
+        "r-order-inventory",
+        "r-order-payment",
+        "r-order-eventbus",
+        "r-payment-paystream",
+        "r-inventory-eventbus",
+        "r-notification-eventbus",
+        "r-notification-postbox"
+      ],
+      "layers": [
+        {
+          "id": "tier-apps",
+          "label": "Apps",
+          "members": [
+            "storefront",
+            "back-office"
+          ]
+        },
+        {
+          "id": "tier-edge",
+          "label": "Edge",
+          "members": [
+            "api-gateway"
+          ]
+        },
+        {
+          "id": "tier-orchestration",
+          "label": "Orchestration",
+          "members": [
+            "order-service"
+          ]
+        },
+        {
+          "id": "tier-core",
+          "label": "Core services",
+          "members": [
+            "auth-service",
+            "catalog-service",
+            "cart-service",
+            "payment-service",
+            "inventory-service",
+            "notification-service"
+          ]
+        },
+        {
+          "id": "tier-platform",
+          "label": "Platform",
+          "members": [
+            "redis",
+            "event-bus"
+          ]
+        },
+        {
+          "id": "tier-external",
+          "label": "External",
+          "members": [
+            "paystream",
+            "postbox"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "use-cases",
+      "title": "What people can do",
+      "description": "Each actor and the things Kestrel lets them do.",
+      "category": "use-cases",
+      "positions": {},
+      "ext": {},
+      "type": "usecase",
+      "useCases": [
+        "cap-browse",
+        "cap-cart",
+        "cap-signup",
+        "cap-login",
+        "cap-checkout",
+        "cap-pay",
+        "cap-track",
+        "cap-cancel",
+        "cap-emails",
+        "cap-products",
+        "cap-stock",
+        "cap-fulfil",
+        "cap-refund"
+      ]
+    },
+    {
+      "id": "team-map",
+      "title": "Team map",
+      "description": "Every team, what it owns, and how to reach it. Drawn by the ownership extension.",
+      "category": "ownership",
+      "positions": {},
+      "ext": {},
+      "type": "extension",
+      "extension": "ownership/team-map",
+      "entities": [
+        "team-web",
+        "team-ops-tooling",
+        "team-identity",
+        "team-catalog",
+        "team-checkout",
+        "team-payments",
+        "team-fulfilment",
+        "team-platform"
+      ],
+      "data": {
+        "teams": [
+          "team-web",
+          "team-ops-tooling",
+          "team-identity",
+          "team-catalog",
+          "team-checkout",
+          "team-payments",
+          "team-fulfilment",
+          "team-platform"
+        ]
+      }
+    },
+    {
+      "title": "Inside the order service",
+      "description": "",
+      "category": "walkthrough",
+      "positions": {},
+      "ext": {},
+      "type": "map",
+      "entities": [
+        "order-service",
+        "order-api",
+        "checkout-orchestrator",
+        "order-domain",
+        "pricing",
+        "order-repository",
+        "payment-client",
+        "inventory-client",
+        "postgres-repository",
+        "event-publisher"
+      ],
+      "passThrough": [],
+      "collapsed": [],
+      "layout": {
+        "direction": "right"
+      },
+      "id": "kestrel-tour.t-inside"
+    }
+  ],
+  "walkthroughs": [
+    {
+      "id": "payment-retry",
+      "kind": "change",
+      "title": "Let customers retry a declined card",
+      "summary": "A declined card no longer cancels the order. The customer gets 30 minutes and three tries, and the stock stays theirs.",
+      "source": {
+        "kind": "Merge request",
+        "ref": "!128",
+        "head": "3f9a2c1e8b7d",
+        "author": "Reviewer agent",
+        "files": 7,
+        "added": 184,
+        "removed": 41
+      },
+      "story": {
+        "text": "Today a single declined card ends the order: Kestrel cancels it, gives the stock back and the customer starts again from an empty cart. After this change the order waits. The customer can try another card for 30 minutes, up to three times, and nobody else can buy the items they held.",
+        "before": "Card declined → order cancelled, stock released, cart lost.",
+        "after": "Card declined → order waits 30 minutes, stock held, three tries."
+      },
+      "overview": "retry-map",
+      "verdict": {
+        "risk": "look",
+        "facts": [
+          {
+            "label": "Door",
+            "value": "Two-way. A revert brings back the cancel on the first decline."
+          },
+          {
+            "label": "Outside",
+            "value": "Nothing new. Paystream is called the same way."
+          },
+          {
+            "label": "Data",
+            "value": "One new column, orders.payment_attempts, default 0."
+          },
+          {
+            "label": "Proof",
+            "value": "CI green, 9 new tests, 1 case without a test."
+          },
+          {
+            "label": "Your time",
+            "value": "About 8 minutes: 96 lines to read, 129 to skim."
+          }
+        ],
+        "findings": []
+      },
+      "marks": [
+        {
+          "ref": "entity:retry-worker",
+          "state": "new"
+        },
+        {
+          "ref": "relationship:r-retry-orderdb",
+          "state": "new"
+        },
+        {
+          "ref": "relationship:r-retry-inventory",
+          "state": "new"
+        },
+        {
+          "ref": "relationship:r-retry-eventbus",
+          "state": "new"
+        },
+        {
+          "ref": "entity:order-service",
+          "state": "changed",
+          "note": "New state, new endpoint, no release on decline."
+        },
+        {
+          "ref": "entity:storefront",
+          "state": "changed",
+          "note": "Shows the retry form."
+        },
+        {
+          "ref": "entity:order-db",
+          "state": "changed",
+          "note": "orders.payment_attempts"
+        },
+        {
+          "ref": "state:order-lifecycle:s-failed",
+          "state": "new"
+        },
+        {
+          "ref": "transition:order-lifecycle:t-declined",
+          "state": "new"
+        },
+        {
+          "ref": "transition:order-lifecycle:t-retry",
+          "state": "new"
+        },
+        {
+          "ref": "transition:order-lifecycle:t-give-up",
+          "state": "new"
+        },
+        {
+          "ref": "transition:order-lifecycle:t-decline-cancel",
+          "state": "removed"
+        },
+        {
+          "ref": "message:checkout:c21",
+          "state": "new"
+        },
+        {
+          "ref": "message:checkout:c22",
+          "state": "changed"
+        },
+        {
+          "ref": "message:checkout:c24",
+          "state": "changed"
+        },
+        {
+          "ref": "message:payment-retry:r2",
+          "state": "new"
+        },
+        {
+          "ref": "message:payment-retry:r3",
+          "state": "new"
+        },
+        {
+          "ref": "message:payment-retry:r4",
+          "state": "new"
+        },
+        {
+          "ref": "message:payment-retry:r13",
+          "state": "new"
+        },
+        {
+          "ref": "message:payment-retry:r14",
+          "state": "new"
+        },
+        {
+          "ref": "message:payment-retry:r15",
+          "state": "new"
+        },
+        {
+          "ref": "dataType:orders#payment_attempts",
+          "state": "new"
+        }
+      ],
+      "removed": {
+        "entities": [],
+        "relationships": [],
+        "transitions": [
+          {
+            "stateMachine": "order-lifecycle",
+            "transition": {
+              "id": "t-decline-cancel",
+              "from": "s-awaiting",
+              "to": "s-cancelled",
+              "event": "Payment declined",
+              "actions": [
+                "Release reservations",
+                "Send cancellation email"
+              ],
+              "triggeredBy": "payment-service"
+            }
+          }
+        ]
+      },
+      "scenes": [
+        {
+          "id": "lifecycle",
+          "title": "A declined card no longer ends the order",
+          "text": "Before, a decline went straight to Cancelled. Now it goes to a new state, Payment failed, where the order waits for another card. Three declines, or 30 minutes without a try, still cancel it.",
+          "risk": "look",
+          "view": "order-lifecycle",
+          "focus": [
+            "state:order-lifecycle:s-awaiting",
+            "state:order-lifecycle:s-failed",
+            "state:order-lifecycle:s-cancelled",
+            "state:order-lifecycle:s-paid",
+            "transition:order-lifecycle:t-declined",
+            "transition:order-lifecycle:t-retry",
+            "transition:order-lifecycle:t-give-up",
+            "transition:order-lifecycle:t-decline-cancel",
+            "transition:order-lifecycle:t-authorized"
+          ],
+          "callouts": [
+            {
+              "target": "transition:order-lifecycle:t-decline-cancel",
+              "text": "Removed. The first decline cancelled the order here."
+            },
+            {
+              "target": "transition:order-lifecycle:t-declined",
+              "text": "A decline now moves the order to Payment failed."
+            },
+            {
+              "target": "transition:order-lifecycle:t-retry",
+              "text": "Each new card is one try. The order goes back to Awaiting payment."
+            },
+            {
+              "target": "transition:order-lifecycle:t-give-up",
+              "text": "After three tries, or 30 minutes, the order is cancelled as before."
+            }
+          ],
+          "cases": [
+            {
+              "when": "The first card is declined",
+              "then": "Payment failed, stock held",
+              "note": "new"
+            },
+            {
+              "when": "Another card is authorized within 30 minutes",
+              "then": "Paid",
+              "note": "same path as a first-time success"
+            },
+            {
+              "when": "The third card is declined",
+              "then": "Cancelled, stock released"
+            },
+            {
+              "when": "30 minutes pass with no new card",
+              "then": "Cancelled by the retry worker"
+            }
+          ],
+          "proof": [
+            {
+              "text": "A decline moves Awaiting payment to Payment failed",
+              "source": "services/orders/internal/domain/order_test.go",
+              "missing": false
+            },
+            {
+              "text": "A fourth try is refused",
+              "source": "services/orders/internal/domain/order_test.go",
+              "missing": false
+            },
+            {
+              "text": "The third decline cancels and releases",
+              "source": "services/orders/internal/domain/order_test.go",
+              "missing": false
+            },
+            {
+              "text": "A decline that arrives while the worker cancels the order",
+              "missing": true
+            }
+          ],
+          "question": "A retry charges the price frozen at checkout, even if the catalog price changed in the 30 minutes. Is that what you want?",
+          "questions": [],
+          "code": [
+            {
+              "path": "services/orders/internal/domain/order.go",
+              "title": "Order.Decline",
+              "notes": [
+                {
+                  "line": 92,
+                  "text": "The count goes up before the check, so the third decline cancels."
+                },
+                {
+                  "line": 98,
+                  "text": "The clock is injected: the tests move time instead of sleeping."
+                }
+              ],
+              "hunks": [
+                {
+                  "header": "@@ -88,12 +88,21 @@ func (o *Order) Decline(reason string) error",
+                  "lines": [
+                    {
+                      "kind": "ctx",
+                      "old": 88,
+                      "new": 88,
+                      "text": "func (o *Order) Decline(reason string) error {"
+                    },
+                    {
+                      "kind": "ctx",
+                      "old": 89,
+                      "new": 89,
+                      "text": "\tif o.Status != AwaitingPayment {"
+                    },
+                    {
+                      "kind": "ctx",
+                      "old": 90,
+                      "new": 90,
+                      "text": "\t\treturn ErrNotAwaitingPayment"
+                    },
+                    {
+                      "kind": "ctx",
+                      "old": 91,
+                      "new": 91,
+                      "text": "\t}"
+                    },
+                    {
+                      "kind": "del",
+                      "old": 92,
+                      "text": "\to.Status = Cancelled"
+                    },
+                    {
+                      "kind": "del",
+                      "old": 93,
+                      "text": "\to.record(OrderCancelled{Reason: reason})"
+                    },
+                    {
+                      "kind": "del",
+                      "old": 94,
+                      "text": "\treturn nil"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 92,
+                      "text": "\to.PaymentAttempts++"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 93,
+                      "text": "\tif o.PaymentAttempts >= MaxPaymentAttempts {"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 94,
+                      "text": "\t\to.Status = Cancelled"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 95,
+                      "text": "\t\to.record(OrderCancelled{Reason: reason})"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 96,
+                      "text": "\t\treturn nil"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 97,
+                      "text": "\t}"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 98,
+                      "text": "\to.Status = PaymentFailed"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 99,
+                      "text": "\to.RetryUntil = o.clock.Now().Add(RetryWindow)"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 100,
+                      "text": "\to.record(PaymentDeclined{Reason: reason, AttemptsLeft: MaxPaymentAttempts - o.PaymentAttempts})"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 101,
+                      "text": "\treturn nil"
+                    },
+                    {
+                      "kind": "ctx",
+                      "old": 95,
+                      "new": 102,
+                      "text": "}"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "trace": [],
+          "effects": [],
+          "badges": []
+        },
+        {
+          "id": "checkout",
+          "title": "Checkout keeps the stock when the card is declined",
+          "text": "In the checkout sequence, only the declined branch changes. The order service no longer releases the reservations. It marks the payment as failed and tells the storefront how many tries are left.",
+          "risk": "look",
+          "view": "checkout-sequence",
+          "focus": [
+            "message:checkout:c20",
+            "message:checkout:c21",
+            "message:checkout:c22",
+            "message:checkout:c23",
+            "message:checkout:c24",
+            "fragment:checkout:c-alt"
+          ],
+          "callouts": [
+            {
+              "target": "message:checkout:c21",
+              "text": "New. This step used to release the reservations. Now the stock stays held."
+            },
+            {
+              "target": "message:checkout:c22",
+              "text": "The answer carries the tries left, so the storefront can say it."
+            },
+            {
+              "target": "message:checkout:c24",
+              "text": "The storefront asks for another card instead of starting over."
+            }
+          ],
+          "cases": [
+            {
+              "when": "Paystream declines the card",
+              "then": "402 with \"tries_left\": 2"
+            },
+            {
+              "when": "Paystream times out",
+              "then": "No change: retried by the payment service as before"
+            }
+          ],
+          "proof": [
+            {
+              "text": "Checkout keeps reservations on a decline",
+              "source": "services/orders/internal/checkout/orchestrator_test.go",
+              "missing": false
+            },
+            {
+              "text": "The 402 body has tries_left",
+              "source": "services/orders/internal/api/handlers_test.go",
+              "missing": false
+            }
+          ],
+          "questions": [],
+          "code": [
+            {
+              "path": "services/orders/internal/checkout/orchestrator.go",
+              "title": "Orchestrator.Checkout",
+              "notes": [
+                {
+                  "line": 113,
+                  "text": "The release moved to the retry worker. Order.Decline decides between waiting and cancelling."
+                }
+              ],
+              "hunks": [
+                {
+                  "header": "@@ -112,9 +112,8 @@ func (c *Orchestrator) Checkout(ctx context.Context, req Request) (Result, error)",
+                  "lines": [
+                    {
+                      "kind": "ctx",
+                      "old": 112,
+                      "new": 112,
+                      "text": "\tif result.Declined() {"
+                    },
+                    {
+                      "kind": "del",
+                      "old": 113,
+                      "text": "\t\tif err := c.stock.Release(ctx, order.ID); err != nil {"
+                    },
+                    {
+                      "kind": "del",
+                      "old": 114,
+                      "text": "\t\t\treturn Result{}, err"
+                    },
+                    {
+                      "kind": "del",
+                      "old": 115,
+                      "text": "\t\t}"
+                    },
+                    {
+                      "kind": "del",
+                      "old": 116,
+                      "text": "\t\torder.Cancel(\"payment declined\")"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 113,
+                      "text": "\t\tif err := order.Decline(result.Reason); err != nil {"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 114,
+                      "text": "\t\t\treturn Result{}, err"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 115,
+                      "text": "\t\t}"
+                    },
+                    {
+                      "kind": "ctx",
+                      "old": 117,
+                      "new": 116,
+                      "text": "\t\tif err := c.orders.Save(ctx, order); err != nil {"
+                    },
+                    {
+                      "kind": "ctx",
+                      "old": 118,
+                      "new": 117,
+                      "text": "\t\t\treturn Result{}, err"
+                    },
+                    {
+                      "kind": "ctx",
+                      "old": 119,
+                      "new": 118,
+                      "text": "\t\t}"
+                    },
+                    {
+                      "kind": "del",
+                      "old": 120,
+                      "text": "\t\treturn Result{Declined: true}, nil"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 119,
+                      "text": "\t\treturn Result{Declined: true, TriesLeft: order.TriesLeft()}, nil"
+                    },
+                    {
+                      "kind": "ctx",
+                      "old": 121,
+                      "new": 120,
+                      "text": "\t}"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "trace": [],
+          "effects": [],
+          "badges": []
+        },
+        {
+          "id": "retry",
+          "title": "The customer tries another card",
+          "text": "A new endpoint takes a new card for an order in Payment failed. The order service checks the window first. Inside it, the payment path is the one checkout already uses. Outside it, the customer gets a clear answer instead of an error.",
+          "risk": "look",
+          "view": "retry-sequence",
+          "focus": [],
+          "callouts": [
+            {
+              "target": "message:payment-retry:r2",
+              "text": "New endpoint on the gateway: POST /orders/:number/payment."
+            },
+            {
+              "target": "message:payment-retry:r4",
+              "text": "Checks the window and the count. A fourth try is refused here."
+            },
+            {
+              "target": "message:payment-retry:r5",
+              "text": "From here on, the same authorization as checkout."
+            },
+            {
+              "target": "message:payment-retry:r14",
+              "text": "410 Gone once the window closed: the order is already cancelled."
+            }
+          ],
+          "cases": [
+            {
+              "when": "Window open, try 2 or 3",
+              "then": "Authorize with the new card"
+            },
+            {
+              "when": "Window closed",
+              "then": "410, \"This order was cancelled\""
+            },
+            {
+              "when": "Order already paid",
+              "then": "409, nothing is charged",
+              "note": "a double click on the form"
+            }
+          ],
+          "proof": [
+            {
+              "text": "Retry inside the window pays the order",
+              "source": "services/orders/internal/api/handlers_test.go",
+              "missing": false
+            },
+            {
+              "text": "Retry after the window returns 410",
+              "source": "services/orders/internal/api/handlers_test.go",
+              "missing": false
+            },
+            {
+              "text": "A double submit charges once",
+              "source": "services/orders/internal/api/handlers_test.go",
+              "missing": false
+            }
+          ],
+          "questions": [],
+          "code": [
+            {
+              "path": "services/orders/internal/api/handlers.go",
+              "title": "RetryPayment",
+              "notes": [
+                {
+                  "line": 155,
+                  "text": "Authorize is the same call that Checkout makes."
+                }
+              ],
+              "hunks": [
+                {
+                  "header": "@@ -0,0 +141,18 @@",
+                  "lines": [
+                    {
+                      "kind": "add",
+                      "new": 141,
+                      "text": "func (h *Handlers) RetryPayment(w http.ResponseWriter, r *http.Request) {"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 142,
+                      "text": "\torder, err := h.orders.ByNumber(r.Context(), chi.URLParam(r, \"number\"))"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 143,
+                      "text": "\tif err != nil {"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 144,
+                      "text": "\t\twriteError(w, http.StatusNotFound, \"order not found\")"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 145,
+                      "text": "\t\treturn"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 146,
+                      "text": "\t}"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 147,
+                      "text": "\tswitch {"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 148,
+                      "text": "\tcase order.Status == domain.Paid:"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 149,
+                      "text": "\t\twriteError(w, http.StatusConflict, \"this order is already paid\")"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 150,
+                      "text": "\t\treturn"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 151,
+                      "text": "\tcase !order.CanRetry(h.clock.Now()):"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 152,
+                      "text": "\t\twriteError(w, http.StatusGone, \"this order was cancelled\")"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 153,
+                      "text": "\t\treturn"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 154,
+                      "text": "\t}"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 155,
+                      "text": "\tresult, err := h.checkout.Authorize(r.Context(), order, decodeMethod(r))"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 156,
+                      "text": "\twriteResult(w, result, err)"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 157,
+                      "text": "}"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "trace": [],
+          "effects": [],
+          "badges": []
+        },
+        {
+          "id": "window",
+          "title": "A worker gives the stock back when time runs out",
+          "text": "Someone has to cancel the orders that nobody retries. A new worker runs every minute, finds orders whose window closed, cancels them, releases their stock and publishes OrderCancelled, so the email goes out as before.",
+          "risk": "routine",
+          "view": "retry-map",
+          "focus": [
+            "entity:retry-worker",
+            "entity:order-db",
+            "entity:inventory-service",
+            "entity:event-bus",
+            "relationship:r-retry-orderdb",
+            "relationship:r-retry-inventory",
+            "relationship:r-retry-eventbus"
+          ],
+          "callouts": [
+            {
+              "target": "entity:retry-worker",
+              "text": "New. Runs every minute, one transaction per order."
+            },
+            {
+              "target": "relationship:r-retry-inventory",
+              "text": "The same release call that checkout made before."
+            },
+            {
+              "target": "relationship:r-retry-eventbus",
+              "text": "OrderCancelled, so the cancellation email is unchanged."
+            }
+          ],
+          "cases": [
+            {
+              "when": "Window closed, status Payment failed",
+              "then": "Cancel, release, publish"
+            },
+            {
+              "when": "Customer paid one second before the run",
+              "then": "Skipped: status is Paid",
+              "note": "the update checks the status"
+            }
+          ],
+          "proof": [
+            {
+              "text": "Expired orders are cancelled once",
+              "source": "services/orders/internal/retrywindow/worker_test.go",
+              "missing": false
+            },
+            {
+              "text": "A paid order is never cancelled",
+              "source": "services/orders/internal/retrywindow/worker_test.go",
+              "missing": false
+            }
+          ],
+          "questions": [],
+          "code": [
+            {
+              "path": "services/orders/internal/retrywindow/worker.go",
+              "title": "Worker.Run",
+              "notes": [
+                {
+                  "line": 31,
+                  "text": "CancelIfStillFailed re-reads the status in the transaction: a payment that just landed wins."
+                }
+              ],
+              "hunks": [
+                {
+                  "header": "@@ -0,0 +1,16 @@",
+                  "lines": [
+                    {
+                      "kind": "add",
+                      "new": 24,
+                      "text": "func (w *Worker) Run(ctx context.Context) error {"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 25,
+                      "text": "\texpired, err := w.orders.RetryWindowClosed(ctx, w.clock.Now(), 100)"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 26,
+                      "text": "\tif err != nil {"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 27,
+                      "text": "\t\treturn err"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 28,
+                      "text": "\t}"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 29,
+                      "text": "\tfor _, order := range expired {"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 30,
+                      "text": "\t\terr := w.orders.InTx(ctx, func(tx Tx) error {"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 31,
+                      "text": "\t\t\tif !order.CancelIfStillFailed(\"retry window closed\") {"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 32,
+                      "text": "\t\t\t\treturn nil"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 33,
+                      "text": "\t\t\t}"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 34,
+                      "text": "\t\t\treturn w.stock.Release(ctx, order.ID)"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 35,
+                      "text": "\t\t})"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 36,
+                      "text": "\t\tif err != nil {"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 37,
+                      "text": "\t\t\tw.log.Warn(\"could not cancel expired order\", \"order\", order.Number, \"err\", err)"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 38,
+                      "text": "\t\t}"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 39,
+                      "text": "\t}"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 40,
+                      "text": "\treturn nil"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 41,
+                      "text": "}"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "trace": [],
+          "effects": [],
+          "badges": []
+        },
+        {
+          "id": "column",
+          "title": "One new column on orders",
+          "text": "The order counts its tries in orders.payment_attempts. Existing rows get 0, so orders that are in flight during the deploy behave as first tries.",
+          "risk": "routine",
+          "view": "retry-map",
+          "focus": [
+            "entity:order-db",
+            "entity:order-service",
+            "relationship:r-order-orderdb"
+          ],
+          "callouts": [
+            {
+              "target": "entity:order-db",
+              "text": "orders.payment_attempts smallint, not null, default 0."
+            }
+          ],
+          "cases": [],
+          "proof": [
+            {
+              "text": "Migration runs up and down on a copy of production",
+              "source": "CI job db:migrate:roundtrip",
+              "missing": false
+            }
+          ],
+          "questions": [],
+          "code": [
+            {
+              "path": "services/orders/migrations/0014_payment_attempts.sql",
+              "notes": [
+                {
+                  "line": 5,
+                  "text": "A partial index: the worker scans only the orders that wait."
+                }
+              ],
+              "hunks": [
+                {
+                  "header": "@@ -0,0 +1,5 @@",
+                  "lines": [
+                    {
+                      "kind": "add",
+                      "new": 1,
+                      "text": "ALTER TABLE orders"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 2,
+                      "text": "  ADD COLUMN payment_attempts smallint NOT NULL DEFAULT 0,"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 3,
+                      "text": "  ADD COLUMN retry_until timestamptz;"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 4,
+                      "text": ""
+                    },
+                    {
+                      "kind": "add",
+                      "new": 5,
+                      "text": "CREATE INDEX orders_retry_until ON orders (retry_until) WHERE status = 'payment_failed';"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "trace": [],
+          "effects": [],
+          "badges": []
+        }
+      ]
+    },
+    {
+      "id": "kestrel-tour",
+      "kind": "tour",
+      "title": "A first walk through Kestrel",
+      "summary": "The parts of Kestrel, and the path of one order from “Place order” to the confirmation email.",
+      "source": {
+        "kind": "Repository",
+        "head": "3f9a2c1e8b7d",
+        "repository": "kestrel/platform"
+      },
+      "story": {
+        "text": "Kestrel is an online store: customers shop on the storefront, and the order service turns a cart into a paid order. Every other service does one job for it. This tour follows one order; it leaves out the back office, search and refunds."
+      },
+      "overview": "system-map",
+      "verdict": {
+        "risk": "routine",
+        "facts": [
+          {
+            "label": "Languages",
+            "value": "Go for orders and payments; Kotlin and TypeScript elsewhere"
+          },
+          {
+            "label": "Run it",
+            "value": "make dev starts every service and Postgres in Docker"
+          },
+          {
+            "label": "Tests",
+            "value": "make test; contract tests run against a fake Paystream"
+          },
+          {
+            "label": "Read first",
+            "value": "services/order/checkout/orchestrator.go"
+          }
+        ],
+        "findings": [
+          {
+            "text": "Emails are sent from events, not from checkout: a slow event bus delays them, not the order.",
+            "severity": "note",
+            "scene": "t-checkout"
+          }
+        ]
+      },
+      "marks": [],
+      "removed": {
+        "entities": [],
+        "relationships": [],
+        "transitions": []
+      },
+      "scenes": [
+        {
+          "id": "t-parts",
+          "title": "One service owns the order",
+          "text": "The storefront talks to Kestrel through the gateway. The order service is at the centre: it asks the cart, payment and inventory services, and announces what happened on the event bus. Open it to see its modules.",
+          "risk": "routine",
+          "view": "system-map",
+          "focus": [],
+          "callouts": [
+            {
+              "target": "entity:order-service",
+              "text": "Checkout lives here. Open the group to see how."
+            },
+            {
+              "target": "entity:event-bus",
+              "text": "Other services learn about orders from events."
+            },
+            {
+              "target": "entity:paystream",
+              "text": "The only outside system in checkout."
+            }
+          ],
+          "cases": [],
+          "proof": [],
+          "questions": [],
+          "code": [],
+          "trace": [],
+          "effects": [
+            {
+              "target": "entity:order-service",
+              "as": "attention"
+            },
+            {
+              "target": "relationship:r-order-eventbus",
+              "as": "flow"
+            }
+          ],
+          "badges": []
+        },
+        {
+          "id": "t-checkout",
+          "title": "One order, from the click to the email",
+          "text": "The order service prices the cart, holds the stock, then asks for payment. On success it marks the order paid and writes an event to its outbox; the email follows from that event.",
+          "risk": "routine",
+          "view": "checkout-sequence",
+          "focus": [
+            "message:checkout:c1",
+            "message:checkout:c2",
+            "message:checkout:c5",
+            "message:checkout:c10",
+            "message:checkout:c11",
+            "message:checkout:c12",
+            "message:checkout:c13",
+            "message:checkout:c17",
+            "message:checkout:c18"
+          ],
+          "callouts": [
+            {
+              "target": "message:checkout:c13",
+              "text": "The order and its event are saved in one transaction."
+            },
+            {
+              "target": "message:checkout:c17",
+              "text": "Published later, from the outbox."
+            }
+          ],
+          "cases": [],
+          "proof": [],
+          "questions": [],
+          "code": [],
+          "trace": [
+            {
+              "ref": "message:checkout:c1",
+              "caption": "The customer places the order."
+            },
+            {
+              "ref": "message:checkout:c2",
+              "caption": "The storefront calls the API."
+            },
+            {
+              "ref": "message:checkout:c5",
+              "caption": "The cart comes back with prices."
+            },
+            {
+              "ref": "message:checkout:c10",
+              "caption": "Payment asks Paystream to authorize."
+            },
+            {
+              "ref": "message:checkout:c12",
+              "caption": "The payment is authorized."
+            },
+            {
+              "ref": "message:checkout:c13",
+              "caption": "The order is paid; its event waits in the outbox."
+            },
+            {
+              "ref": "message:checkout:c17",
+              "caption": "The event goes out on the bus."
+            },
+            {
+              "ref": "message:checkout:c18",
+              "caption": "Notifications hears it and sends the email."
+            }
+          ],
+          "effects": [
+            {
+              "target": "message:checkout:c10",
+              "as": "slow"
+            },
+            {
+              "target": "message:checkout:c17",
+              "as": "flow"
+            },
+            {
+              "target": "message:checkout:c18",
+              "as": "flow"
+            }
+          ],
+          "badges": [
+            {
+              "target": "message:checkout:c10",
+              "text": "p95 840 ms"
+            }
+          ]
+        },
+        {
+          "id": "t-inside",
+          "title": "Inside the order service",
+          "text": "The API hands checkout to one orchestrator. It uses the domain for rules and prices, and talks to other services only through ports, so the clients can be swapped in tests.",
+          "risk": "routine",
+          "view": "kestrel-tour.t-inside",
+          "focus": [
+            "entity:checkout-orchestrator",
+            "relationship:d-api-checkout",
+            "relationship:d-checkout-domain",
+            "relationship:d-checkout-pricing",
+            "relationship:d-checkout-repo"
+          ],
+          "callouts": [
+            {
+              "target": "entity:checkout-orchestrator",
+              "text": "Start reading here: one function per step of checkout."
+            }
+          ],
+          "cases": [],
+          "proof": [],
+          "questions": [],
+          "code": [
+            {
+              "path": "services/order/checkout/orchestrator.go",
+              "title": "Checkout.Place",
+              "notes": [
+                {
+                  "line": 47,
+                  "text": "Stock is held before payment, so a paid order always has its items."
+                }
+              ],
+              "hunks": [
+                {
+                  "lines": [
+                    {
+                      "kind": "ctx",
+                      "new": 42,
+                      "text": "func (c *Checkout) Place(ctx context.Context, req PlaceRequest) (*Order, error) {"
+                    },
+                    {
+                      "kind": "ctx",
+                      "new": 43,
+                      "text": "\torder, err := c.domain.NewOrder(req.Cart)"
+                    },
+                    {
+                      "kind": "ctx",
+                      "new": 44,
+                      "text": "\tif err != nil {"
+                    },
+                    {
+                      "kind": "ctx",
+                      "new": 45,
+                      "text": "\t\treturn nil, err"
+                    },
+                    {
+                      "kind": "ctx",
+                      "new": 46,
+                      "text": "\t}"
+                    },
+                    {
+                      "kind": "ctx",
+                      "new": 47,
+                      "text": "\tif err := c.inventory.Reserve(ctx, order.Lines); err != nil {"
+                    },
+                    {
+                      "kind": "ctx",
+                      "new": 48,
+                      "text": "\t\treturn nil, err"
+                    },
+                    {
+                      "kind": "ctx",
+                      "new": 49,
+                      "text": "\t}"
+                    },
+                    {
+                      "kind": "ctx",
+                      "new": 50,
+                      "text": "\treturn c.pay(ctx, order)"
+                    },
+                    {
+                      "kind": "ctx",
+                      "new": 51,
+                      "text": "}"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "trace": [],
+          "effects": [],
+          "badges": []
+        },
+        {
+          "id": "t-states",
+          "title": "An order moves through a few states",
+          "text": "The order state machine is the best summary of the rules. Payment can fail and be retried; once the warehouse starts picking, the order can no longer be cancelled.",
+          "risk": "routine",
+          "view": "order-lifecycle",
+          "focus": [],
+          "callouts": [],
+          "cases": [],
+          "proof": [
+            {
+              "text": "Every allowed transition, and the refused ones",
+              "source": "services/order/domain/order_test.go",
+              "test": "TestTransitions",
+              "missing": false
+            }
+          ],
+          "question": "From which states can a customer still cancel?",
+          "questions": [],
+          "code": [],
+          "trace": [],
+          "effects": [],
+          "badges": []
+        }
+      ]
+    }
+  ],
+  "presentation": {
+    "kinds": {
+      "ownership/team": {
+        "shape": "card",
+        "tone": "ochre",
+        "icon": "users",
+        "label": "Team"
+      },
+      "person": {
+        "shape": "person",
+        "tone": "slate",
+        "icon": "user-round",
+        "label": "Person"
+      },
+      "system": {
+        "shape": "frame",
+        "tone": "slate",
+        "icon": "boxes",
+        "label": "Software system"
+      },
+      "web-app": {
+        "shape": "card",
+        "tone": "tyrian",
+        "icon": "app-window",
+        "label": "Web app"
+      },
+      "gateway": {
+        "shape": "card",
+        "tone": "slate",
+        "icon": "route",
+        "label": "Gateway"
+      },
+      "service": {
+        "shape": "card",
+        "tone": "lapis",
+        "icon": "server",
+        "label": "Service"
+      },
+      "database": {
+        "shape": "cylinder",
+        "tone": "malachite",
+        "icon": "database",
+        "label": "Database"
+      },
+      "cache": {
+        "shape": "cylinder",
+        "tone": "verdigris",
+        "icon": "zap",
+        "label": "Cache"
+      },
+      "message-broker": {
+        "shape": "stack",
+        "tone": "ochre",
+        "icon": "waypoints",
+        "label": "Message broker"
+      },
+      "external": {
+        "shape": "card",
+        "tone": "umber",
+        "icon": "globe",
+        "label": "External system"
+      },
+      "component": {
+        "shape": "chip",
+        "tone": "lapis",
+        "icon": "box",
+        "label": "Component"
+      },
+      "interface": {
+        "shape": "chip",
+        "tone": "tyrian",
+        "icon": "plug",
+        "label": "Interface"
+      },
+      "library": {
+        "shape": "chip",
+        "tone": "slate",
+        "icon": "library",
+        "label": "Library"
+      }
+    },
+    "relationships": {
+      "uses": {
+        "pattern": "solid",
+        "head": "arrow"
+      },
+      "calls": {
+        "pattern": "solid",
+        "head": "arrow"
+      },
+      "reads": {
+        "pattern": "solid",
+        "head": "arrow"
+      },
+      "writes": {
+        "pattern": "solid",
+        "head": "arrow"
+      },
+      "reads-writes": {
+        "pattern": "solid",
+        "head": "none"
+      },
+      "publishes": {
+        "pattern": "dashed",
+        "head": "open-arrow"
+      },
+      "subscribes": {
+        "pattern": "dashed",
+        "head": "open-arrow"
+      },
+      "depends-on": {
+        "pattern": "solid",
+        "head": "arrow"
+      },
+      "implements": {
+        "pattern": "dashed",
+        "head": "triangle"
+      }
+    },
+    "elements": {
+      "auth-service": {
+        "icon": "key-round"
+      },
+      "catalog-service": {
+        "icon": "book-open"
+      },
+      "cart-service": {
+        "icon": "shopping-cart"
+      },
+      "order-service": {
+        "icon": "receipt",
+        "emphasis": true
+      },
+      "retry-worker": {
+        "icon": "timer"
+      },
+      "payment-service": {
+        "icon": "credit-card"
+      },
+      "inventory-service": {
+        "icon": "package"
+      },
+      "notification-service": {
+        "icon": "mail"
+      },
+      "paystream": {
+        "icon": "landmark"
+      },
+      "postbox": {
+        "icon": "send"
+      },
+      "storefront": {
+        "icon": "store"
+      },
+      "back-office": {
+        "icon": "clipboard-list"
+      },
+      "store-operator": {
+        "icon": "user-cog"
+      }
+    },
+    "views": {}
+  }
+}

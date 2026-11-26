@@ -1,0 +1,99 @@
+{
+  "poneyVersion": "0.2.0",
+  "project": {
+    "id": "tiny",
+    "name": "Tiny",
+    "description": "The smallest useful document."
+  },
+  "model": {
+    "entities": [
+      {
+        "id": "user",
+        "kind": "person",
+        "name": "User",
+        "summary": "Uses the app."
+      },
+      {
+        "id": "app",
+        "kind": "web-app",
+        "name": "App",
+        "summary": "The app people use."
+      },
+      {
+        "id": "api",
+        "kind": "service",
+        "name": "API",
+        "summary": "Answers the app."
+      },
+      {
+        "id": "robot",
+        "kind": "acme/robot",
+        "name": "Robot",
+        "summary": "Moves boxes.",
+        "ext": {
+          "acme": {
+            "payload": 40
+          }
+        }
+      }
+    ],
+    "relationships": [
+      {
+        "id": "r-user-app",
+        "kind": "uses",
+        "source": "user",
+        "target": "app",
+        "label": "Uses"
+      },
+      {
+        "id": "r-app-api",
+        "kind": "calls",
+        "source": "app",
+        "target": "api",
+        "label": "Fetches data from",
+        "protocol": "HTTPS"
+      }
+    ]
+  },
+  "views": [
+    {
+      "id": "main",
+      "type": "architecture",
+      "title": "Main",
+      "description": "Everything.",
+      "category": "overview",
+      "entities": [
+        "user",
+        "app",
+        "api"
+      ]
+    },
+    {
+      "id": "floor",
+      "type": "extension",
+      "extension": "acme/floor-plan",
+      "title": "Floor",
+      "description": "Where robots are.",
+      "category": "operations",
+      "entities": [
+        "robot"
+      ],
+      "data": {
+        "grid": [
+          10,
+          10
+        ]
+      }
+    }
+  ],
+  "presentation": {
+    "kinds": {},
+    "relationships": {}
+  },
+  "extensions": [
+    {
+      "name": "acme",
+      "version": "2.0.0"
+    }
+  ]
+}

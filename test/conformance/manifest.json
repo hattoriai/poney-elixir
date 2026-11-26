@@ -1,0 +1,130 @@
+{
+  "poneyVersion": "0.1.0",
+  "about": "Each file is a Poney document. A conforming reader accepts every valid file and rejects every invalid one. For invalid files it should report errors at each listed path (paths use dots and array indexes, as in JSON Pointer without the leading slash). Readers in other languages run this suite to prove conformance.",
+  "cases": [
+    {
+      "file": "valid/minimal.poney",
+      "valid": true,
+      "rule": "\u00a73",
+      "description": "Smallest document: three entities, two relationships, one view. Defaults fill the rest; missing styles are warnings."
+    },
+    {
+      "file": "valid/sequence-with-fragments.poney",
+      "valid": true,
+      "rule": "\u00a75.6.1, \u00a76.2",
+      "description": "Nested fragments; message ids unique within the interaction."
+    },
+    {
+      "file": "valid/unknown-optional-extension.poney",
+      "valid": true,
+      "rule": "\u00a78.4",
+      "description": "A reader that does not know an optional extension accepts the document, keeps the extension data and reports warnings."
+    },
+    {
+      "file": "valid/walkthrough.poney",
+      "valid": true,
+      "rule": "\u00a75.8",
+      "description": "A walkthrough with a mark, a focused scene and a callout."
+    },
+    {
+      "file": "invalid/duplicate-entity-id.poney",
+      "valid": false,
+      "rule": "R1",
+      "description": "Two entities share an id.",
+      "errorPaths": [
+        "model.entities.3.id"
+      ]
+    },
+    {
+      "file": "invalid/dangling-relationship.poney",
+      "valid": false,
+      "rule": "R3",
+      "description": "A relationship points at an entity that does not exist.",
+      "errorPaths": [
+        "model.relationships.1.target"
+      ]
+    },
+    {
+      "file": "invalid/malformed-id.poney",
+      "valid": false,
+      "rule": "\u00a74",
+      "description": "Identifiers are lowercase and contain no spaces.",
+      "errorPaths": [
+        "model.entities.0.id"
+      ]
+    },
+    {
+      "file": "invalid/containment-cycle.poney",
+      "valid": false,
+      "rule": "R2",
+      "description": "Containment must form a tree.",
+      "errorPaths": [
+        "model.entities.1.parent",
+        "model.entities.2.parent"
+      ]
+    },
+    {
+      "file": "invalid/message-from-non-participant.poney",
+      "valid": false,
+      "rule": "R7",
+      "description": "Messages may only be sent between participants.",
+      "errorPaths": [
+        "model.behaviors.0.steps.0.from"
+      ]
+    },
+    {
+      "file": "invalid/foreign-key-to-missing-field.poney",
+      "valid": false,
+      "rule": "R5",
+      "description": "A foreign key must name a field that exists.",
+      "errorPaths": [
+        "model.dataTypes.1.fields.1.references"
+      ]
+    },
+    {
+      "file": "invalid/two-initial-states.poney",
+      "valid": false,
+      "rule": "R9",
+      "description": "A state machine has exactly one initial state.",
+      "errorPaths": [
+        "model.behaviors.0.states"
+      ]
+    },
+    {
+      "file": "invalid/unknown-required-extension.poney",
+      "valid": false,
+      "rule": "\u00a78.4",
+      "description": "A reader must refuse a document whose required extension it does not know.",
+      "errorPaths": [
+        "extensions.0"
+      ]
+    },
+    {
+      "file": "invalid/undeclared-extension-kind.poney",
+      "valid": false,
+      "rule": "\u00a78.2",
+      "description": "Extension kinds need the extension declared in `extensions`.",
+      "errorPaths": [
+        "model.entities.2.kind"
+      ]
+    },
+    {
+      "file": "invalid/view-references-unknown-entity.poney",
+      "valid": false,
+      "rule": "R11",
+      "description": "Views reference entities; they never define them.",
+      "errorPaths": [
+        "views.0.entities.3"
+      ]
+    },
+    {
+      "file": "invalid/walkthrough-unknown-ref.poney",
+      "valid": false,
+      "rule": "R13",
+      "description": "A callout must point at an element that exists.",
+      "errorPaths": [
+        "walkthroughs.0.scenes.0.callouts.0.target"
+      ]
+    }
+  ]
+}
