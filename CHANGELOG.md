@@ -8,6 +8,12 @@ The Poney format has its own version (`Poney.format_version/0`).
 
 ## [Unreleased]
 
+### Changed
+
+- The package description on Hex says the library writes documents too.
+
+## [0.1.0] - 2026-11-26
+
 ### Added
 
 - `Poney.read/1` and `Poney.read!/1`: a conforming reader of the Poney

@@ -63,7 +63,7 @@ defmodule Poney.MixProject do
   end
 
   defp description do
-    "The Poney format in Elixir: read, check and walk Poney documents " <>
+    "The Poney format in Elixir: read, check and write Poney documents " <>
       "(software explained in diagrams), as the specification says."
   end
 
