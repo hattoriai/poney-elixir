@@ -4195,7 +4195,7 @@
         {
           "id": "zone-apps",
           "label": "Apps and edge",
-          "description": "What people use, and the single door into the platform.",
+          "description": "What people use, and the only way into the platform.",
           "members": [
             "storefront",
             "back-office",
@@ -4276,7 +4276,7 @@
         {
           "id": "zone-apps",
           "label": "Apps and edge",
-          "description": "What people use, and the single door into the platform.",
+          "description": "What people use, and the only way into the platform.",
           "members": [
             "storefront",
             "back-office",
@@ -4780,12 +4780,12 @@
         "risk": "look",
         "facts": [
           {
-            "label": "Door",
-            "value": "Two-way. A revert brings back the cancel on the first decline."
+            "label": "Undo",
+            "value": "A revert undoes it, and brings back the cancel on the first decline."
           },
           {
-            "label": "Outside",
-            "value": "Nothing new. Paystream is called the same way."
+            "label": "Other systems",
+            "value": "None new. Paystream is called the same way."
           },
           {
             "label": "Data",
@@ -4796,7 +4796,7 @@
             "value": "CI green, 9 new tests, 1 case without a test."
           },
           {
-            "label": "Your time",
+            "label": "To read",
             "value": "About 8 minutes: 96 lines to read, 129 to skim."
           }
         ],

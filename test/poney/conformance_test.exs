@@ -23,9 +23,10 @@ defmodule Poney.ConformanceTest do
             do: assert(path in errors, "no error at #{path}: #{inspect(errors)}")
       end
 
-      # Shape faults (§4) fail the published schema too; every other case fits it.
+      # Shape faults (§4) and members the format does not define (§9.1)
+      # fail the published schema too; every other case fits it.
       assert JSV.validate(doc, Fixtures.jsv()) |> elem(0) ==
-               if(@case["rule"] == "§4", do: :error, else: :ok)
+               if(@case["rule"] in ["§4", "§9.1"], do: :error, else: :ok)
     end
   end
 

@@ -32,4 +32,4 @@ The Poney format has its own version (`Poney.format_version/0`).
   scenes (`Poney.Walkthrough.*`, `Poney.Scene.*`) and the presentation.
 - `Poney.Ref`: refs such as `"entity:order-service"`, read and written.
 - `mix poney.spec`: copies the schema, the conformance suite and the examples
-  from a tagged release of Poney (now `v0.2.0`).
+  from a tagged release of Poney (now `v0.3.1`).
