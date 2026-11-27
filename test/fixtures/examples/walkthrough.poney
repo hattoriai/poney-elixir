@@ -367,12 +367,12 @@
         "risk": "look",
         "facts": [
           {
-            "label": "Door",
-            "value": "Two-way. A revert removes the lock; the new columns stay unused."
+            "label": "Undo",
+            "value": "A revert undoes it: the lock goes, and the new columns stay unused."
           },
           {
-            "label": "Outside",
-            "value": "Email provider, one new email."
+            "label": "Other systems",
+            "value": "The email provider: one new email."
           },
           {
             "label": "Data",

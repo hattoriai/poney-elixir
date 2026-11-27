@@ -125,6 +125,16 @@
       "errorPaths": [
         "walkthroughs.0.scenes.0.callouts.0.target"
       ]
+    },
+    {
+      "file": "invalid/unknown-member.poney",
+      "valid": false,
+      "rule": "\u00a79.1",
+      "description": "A member the format does not define is an error, not dropped. Extension data goes under \"ext\".",
+      "errorPaths": [
+        "project.colour",
+        "model.entities.0.colour"
+      ]
     }
   ]
 }
